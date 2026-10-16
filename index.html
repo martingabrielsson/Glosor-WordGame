@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glosor</title>
+<style>
+  :root {
+    --bg: #efe6fb; --card: #ffffff; --ink: #2d2250; --muted: #7a6ba3;
+    --purple: #7c4dff; --purple-d: #5e35d1; --orange: #f7ae72; --orange-d: #e8934f;
+    --green: #2bb673; --red: #e5484d; --line: #d8c6f0; --yellow: #ffd54a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; min-height: 100vh; padding: 14px; }
+  .screen { display: none; max-width: 760px; margin: 0 auto; }
+  .screen.active { display: block; }
+  h1, h2 { text-align: center; }
+  h2 { font-size: 26px; margin-bottom: 14px; }
+  .btn { display: block; width: 100%; padding: 16px 20px; margin: 10px 0; border: none; border-radius: 18px; font: inherit; font-size: 20px; font-weight: 700; color: #fff; background: var(--purple); cursor: pointer; box-shadow: 0 5px 0 var(--purple-d); transition: transform .08s; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--purple-d); }
+  .btn.orange { background: var(--orange); box-shadow: 0 5px 0 var(--orange-d); color: #4a2a05; }
+  .btn.green { background: var(--green); box-shadow: 0 5px 0 #1f8c59; }
+  .btn.ghost { background: #fff; color: var(--purple-d); box-shadow: 0 4px 0 var(--line); border: 2px solid var(--line); }
+  .btn.small { display: inline-block; width: auto; font-size: 15px; padding: 8px 14px; margin: 3px; border-radius: 12px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .box { background: var(--card); border-radius: 20px; padding: 16px; box-shadow: 0 4px 14px rgba(124,77,255,.12); margin-bottom: 12px; }
+  .muted { color: var(--muted); }
+
+  /* Home */
+  #logo { width: min(260px, 70vw); display: block; margin: 8px auto 4px; filter: drop-shadow(0 8px 14px rgba(94,53,209,.25)); }
+  .tagline { text-align: center; color: var(--muted); margin-bottom: 8px; }
+  .activelist { text-align: center; font-size: 18px; }
+  .activelist b { color: var(--purple-d); }
+  .bests { text-align: center; font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+  /* Lists */
+  .listrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .listrow .info { flex: 1; min-width: 160px; }
+  .listrow .info b { font-size: 19px; }
+  .listrow.active { outline: 3px solid var(--purple); }
+  .badge { background: var(--yellow); color: #5a4300; border-radius: 10px; padding: 2px 8px; font-size: 13px; font-weight: 700; }
+
+  /* Editor */
+  .cols { display: grid; grid-template-columns: 28px 1fr 1fr 40px; gap: 6px; font-weight: 700; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+  .erow { display: grid; grid-template-columns: 28px 1fr 1fr 40px; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .erow .n { color: var(--muted); font-size: 13px; text-align: center; }
+  input[type=text] { width: 100%; padding: 10px 12px; font: inherit; font-size: 17px; border: 2px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); outline: none; }
+  input[type=text]:focus { border-color: var(--purple); }
+  input.bad { border-color: var(--red); background: #fff1f1; }
+  .del { border: none; background: #fde8e8; color: var(--red); border-radius: 10px; font-size: 18px; height: 40px; cursor: pointer; }
+  #ed-status { text-align: center; font-weight: 700; margin: 8px 0; min-height: 24px; }
+  #ed-name { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 10px; }
+
+  /* Quiz */
+  .progress { height: 14px; background: var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+  .progress > div { height: 100%; width: 0; background: var(--green); transition: width .3s; }
+  .qinfo { display: flex; justify-content: space-between; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+  .prompt-card { text-align: center; padding: 28px 12px; border-radius: 24px; font-size: 38px; font-weight: 800; margin: 10px 0; word-break: break-word; }
+  .prompt-card.sv { background: #2d2250; color: #fff; }
+  .prompt-card.en { background: #fff; color: var(--ink); border: 3px solid var(--line); }
+  .prompt-card small { display: block; font-size: 14px; font-weight: 600; opacity: .7; margin-bottom: 6px; }
+  .answer-row { display: flex; gap: 8px; }
+  .answer-row input { font-size: 24px; text-align: center; padding: 14px; }
+  .answer-row .btn { width: auto; margin: 0; padding: 0 18px; font-size: 24px; }
+  #q-hint { text-align: center; min-height: 30px; font-size: 24px; letter-spacing: 4px; font-weight: 700; color: var(--orange-d); margin: 8px 0; }
+  #q-feedback { text-align: center; font-size: 22px; font-weight: 800; min-height: 60px; margin-top: 6px; }
+  #q-feedback.ok { color: var(--green); } #q-feedback.no { color: var(--red); }
+  .shake { animation: shake .35s; }
+  @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+  /* Result */
+  .stars { font-size: 60px; text-align: center; letter-spacing: 6px; }
+  .bignum { text-align: center; font-size: 22px; margin: 6px 0; }
+  .newbest { text-align: center; color: var(--orange-d); font-weight: 800; font-size: 20px; }
+
+  /* Memory */
+  .hud { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .hud .hb { flex: 1; min-width: 80px; background: #fff; border-radius: 14px; padding: 6px 10px; text-align: center; font-weight: 800; font-size: 18px; }
+  .hud .hb span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+  #board { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .card { min-height: 78px; border-radius: 14px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 6px; font-weight: 800; font-size: 16px; cursor: pointer; user-select: none; border: 4px solid transparent; transition: transform .1s, opacity .2s; word-break: break-word; }
+  .card.english { background: #fff; color: #111; border-color: #ddd; }
+  .card.swedish { background: #1c1633; color: #fff; border-color: #3b3159; }
+  .card.selected { border-color: var(--yellow) !important; transform: scale(1.06); }
+  .card.matched { opacity: .35; border-color: var(--green) !important; cursor: default; }
+  .card.wrong { border-color: var(--red) !important; animation: shake .35s; }
+
+  #cheer { position: fixed; top: 40%; left: 50%; transform: translate(-50%,-50%) scale(.8); background: #fff; border: 4px solid var(--purple); border-radius: 22px; padding: 18px 32px; text-align: center; font-size: 28px; font-weight: 800; z-index: 50; opacity: 0; pointer-events: none; transition: all .2s; }
+  #cheer.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  .confetti { position: fixed; top: -30px; font-size: 26px; z-index: 60; pointer-events: none; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(540deg); } }
+  .speak { border: none; background: var(--yellow); border-radius: 50%; width: 44px; height: 44px; font-size: 20px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="home" class="screen">
+  <svg id="logo" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Glosor">
+    <defs><clipPath id="sq"><rect x="6" y="6" width="188" height="188" rx="48"/></clipPath></defs>
+    <rect x="6" y="6" width="188" height="188" rx="48" fill="#d8c6f0"/>
+    <g clip-path="url(#sq)" font-family="Trebuchet MS, sans-serif" font-size="9" font-weight="700" fill="#7f9bd6" opacity=".85">
+      <text x="-10" y="26">hello · hola · bonjour · ciao · hallo · ord · word · mot</text>
+      <text x="-30" y="48">language · langue · lingua · sprache · idioma · glosor</text>
+      <text x="-5" y="70">gracias · merci · grazie · tack · thanks · tack · hej</text>
+      <text x="-20" y="92">book · libro · livre · bok · ord · mot · palabra</text>
+      <text x="-12" y="114">amigo · ami · friend · vän · hus · house · casa</text>
+      <text x="-26" y="136">sun · sol · soleil · sonne · learn · lära · lesen</text>
+      <text x="-8" y="158">vocabulary · vocabulaire · écrire · läsa · read</text>
+      <text x="-22" y="180">goodbye · adiós · au revoir · ciao · hej då · adieu</text>
+    </g>
+    <text x="100" y="146" text-anchor="middle" font-family="Georgia, 'Arial Rounded MT Bold', serif" font-weight="900" font-size="150" fill="#f0a96c" stroke="#f0a96c" stroke-width="6" stroke-linejoin="round">G</text>
+  </svg>
+  <h1 style="font-size:34px;color:var(--purple-d)">Glosor</h1>
+  <p class="tagline">Lär dig engelska ord!</p>
+  <div class="box">
+    <div class="activelist">Veckans glosor: <b id="h-list">–</b></div>
+    <div class="bests" id="h-best"></div>
+  </div>
+  <button class="btn" id="h-quiz">✏️ Öva glosor</button>
+  <button class="btn orange" id="h-memory">🃏 Memory</button>
+  <button class="btn green" id="h-lists">📚 Mina ordlistor</button>
+  <button class="btn ghost small" id="h-mute" style="margin:10px auto;display:block"></button>
+</div>
+
+<!-- LISTS -->
+<div id="lists" class="screen">
+  <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button><button class="btn small" id="l-new">+ Ny lista</button></div>
+  <h2>Mina ordlistor</h2>
+  <div id="l-items"></div>
+</div>
+
+<!-- EDITOR -->
+<div id="editor" class="screen">
+  <div class="topbar"><button class="btn small ghost" id="ed-back">← Listor</button><button class="btn small ghost" id="ed-rename">✎ Byt namn</button></div>
+  <div id="ed-name"></div>
+  <div class="box">
+    <div class="cols"><span></span><span>ENGELSKA</span><span>SVENSKA</span><span></span></div>
+    <div id="ed-rows"></div>
+    <div id="ed-status"></div>
+    <p class="muted" style="font-size:13px;text-align:center">Max 20 ord. Flera rätta svar? Skriv med / emellan, t.ex. <i>bil / auto</i>. Allt sparas automatiskt.</p>
+  </div>
+  <button class="btn green" id="ed-done">Klar ✓</button>
+</div>
+
+<!-- QUIZ SETUP -->
+<div id="quizsetup" class="screen">
+  <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button></div>
+  <h2>Vad vill du öva?</h2>
+  <button class="btn" data-dir="sv2en">🇸🇪 → 🇬🇧 Se svenska, skriv engelska</button>
+  <button class="btn orange" data-dir="en2sv">🇬🇧 → 🇸🇪 Se engelska, skriv svenska</button>
+  <button class="btn green" data-dir="mix">🔀 Blandat</button>
+</div>
+
+<!-- QUIZ -->
+<div id="quiz" class="screen">
+  <div class="topbar"><button class="btn small ghost" id="q-quit">✕ Avsluta</button><button class="speak" id="q-speak" title="Lyssna">🔊</button></div>
+  <div class="progress"><div id="q-bar"></div></div>
+  <div class="qinfo"><span id="q-count"></span><span id="q-score"></span></div>
+  <div class="prompt-card" id="q-card"></div>
+  <div class="answer-row">
+    <input type="text" id="q-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Skriv här…">
+    <button class="btn" id="q-check">✓</button>
+  </div>
+  <div id="q-hint"></div>
+  <div id="q-feedback"></div>
+  <button class="btn ghost" id="q-hintbtn">💡 Ledtråd</button>
+</div>
+
+<!-- RESULT -->
+<div id="result" class="screen">
+  <h2 id="r-title">Bra jobbat!</h2>
+  <div class="stars" id="r-stars"></div>
+  <div class="bignum" id="r-text"></div>
+  <div class="newbest" id="r-best"></div>
+  <button class="btn" id="r-again">Spela igen</button>
+  <button class="btn ghost" data-go="home">Hem</button>
+</div>
+
+<!-- MEMORY -->
+<div id="memory" class="screen">
+  <div class="topbar"><button class="btn small ghost" id="m-quit">← Hem</button><button class="btn small" id="m-restart">↻ Ny omgång</button></div>
+  <div class="hud">
+    <div class="hb"><span>Poäng</span><b id="m-score">0</b></div>
+    <div class="hb"><span>Tid</span><b id="m-time">0:00</b></div>
+    <div class="hb"><span>Par</span><b id="m-pairs">0/0</b></div>
+  </div>
+  <p class="muted" style="text-align:center;margin-bottom:8px">Klicka på ett <b>vitt</b> engelskt kort och sedan på rätt <b>svart</b> svenskt kort.</p>
+  <div id="board"></div>
+</div>
+
+<div id="cheer"></div>
+
+<script>
+'use strict';
+const KEY = 'glosor.v1', MAX_WORDS = 20;
+const CHEERS = ['Fantastiskt!','Superbra!','Grymt!','Snyggt!','Bra jobbat!','Toppen!','Wow!','Perfekt!','Du är bäst!','Heja!'];
+
+/* ---------- storage ---------- */
+let state = load();
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.lists)) return s; } catch (e) {}
+  return { lists: [], activeListId: null, muted: false };
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+const uid = () => Math.random().toString(36).slice(2, 9);
+function isoWeek(d = new Date()) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return Math.ceil(((t - new Date(Date.UTC(t.getUTCFullYear(), 0, 1))) / 864e5 + 1) / 7);
+}
+function newList(name) {
+  const l = { id: uid(), name: name || ('Vecka ' + isoWeek()), words: [], best: {} };
+  state.lists.push(l); state.activeListId = l.id; save(); return l;
+}
+function active() { return state.lists.find(l => l.id === state.activeListId) || null; }
+if (!state.lists.length) newList();
+if (!active()) { state.activeListId = state.lists[0].id; save(); }
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const norm = s => s.toLowerCase().replace(/\s+/g, ' ').trim();
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active'); window.scrollTo(0, 0);
+  if (id === 'home') renderHome();
+  if (id === 'lists') renderLists();
+}
+document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) { stopTimers(); show(g.dataset.go); } });
+function answers(str) { // accepted alternatives
+  const all = [norm(str)];
+  str.split(/[\/,;]/).forEach(p => { const n = norm(p); if (n && !all.includes(n)) all.push(n); });
+  return all;
+}
+function speak(text) {
+  if (state.muted || !('speechSynthesis' in window)) return;
+  try { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 0.85; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+}
+
+/* ---------- sound ---------- */
+let actx;
+function tone(freq, start, dur, type = 'sine', vol = 0.15) {
+  if (state.muted) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq; o.connect(g); g.connect(actx.destination);
+    const t = actx.currentTime + start;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+const sfx = {
+  ok: () => { tone(660, 0, .12); tone(880, .1, .18); },
+  no: () => { tone(220, 0, .2, 'sawtooth', .1); tone(165, .15, .25, 'sawtooth', .1); },
+  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .14, .25)),
+};
+function confetti() {
+  const em = ['🎉', '⭐', '✨', '🎈', '💜', '🧡'];
+  for (let i = 0; i < 36; i++) {
+    const s = document.createElement('span'); s.className = 'confetti'; s.textContent = em[i % em.length];
+    s.style.left = Math.random() * 100 + 'vw'; s.style.animationDuration = (2 + Math.random() * 2) + 's'; s.style.animationDelay = Math.random() * .8 + 's';
+    document.body.appendChild(s); setTimeout(() => s.remove(), 5000);
+  }
+}
+let cheerT;
+function cheer(text) { const c = $('cheer'); c.textContent = text; c.classList.add('show'); clearTimeout(cheerT); cheerT = setTimeout(() => c.classList.remove('show'), 1100); }
+
+/* ---------- home ---------- */
+function renderHome() {
+  const l = active();
+  $('h-list').textContent = l ? `${l.name} (${l.words.length} ord)` : '–';
+  const b = l && l.best || {};
+  const parts = [];
+  if (b.quiz != null) parts.push('Bästa övning: ' + b.quiz + ' p');
+  if (b.memory != null) parts.push('Bästa memory: ' + b.memory + ' p');
+  $('h-best').textContent = parts.join(' · ');
+  $('h-mute').textContent = state.muted ? '🔇 Ljud av' : '🔊 Ljud på';
+}
+function needWords(min) {
+  const l = active();
+  if (!l || l.words.length < min) { alert(`Lägg först in minst ${min} ord i listan!`); openEditor(l ? l.id : null); return false; }
+  return true;
+}
+$('h-quiz').onclick = () => { if (needWords(1)) show('quizsetup'); };
+$('h-memory').onclick = () => { if (needWords(2)) startMemory(); };
+$('h-lists').onclick = () => show('lists');
+$('h-mute').onclick = () => { state.muted = !state.muted; save(); renderHome(); };
+
+/* ---------- lists ---------- */
+function renderLists() {
+  const box = $('l-items'); box.innerHTML = '';
+  state.lists.forEach(l => {
+    const d = document.createElement('div'); d.className = 'box listrow' + (l.id === state.activeListId ? ' active' : '');
+    d.innerHTML = `<div class="info"><b></b> ${l.id === state.activeListId ? '<span class="badge">Vald</span>' : ''}<div class="muted">${l.words.length} / ${MAX_WORDS} ord</div></div>`;
+    d.querySelector('b').textContent = l.name;
+    const mk = (txt, cls, fn) => { const b = document.createElement('button'); b.className = 'btn small ' + cls; b.textContent = txt; b.onclick = fn; d.appendChild(b); };
+    if (l.id !== state.activeListId) mk('Välj', '', () => { state.activeListId = l.id; save(); renderLists(); });
+    mk('✎ Ändra ord', 'orange', () => openEditor(l.id));
+    mk('🗑', 'ghost', () => { if (confirm(`Ta bort listan "${l.name}" och alla dess ord?`)) deleteList(l.id); });
+    box.appendChild(d);
+  });
+}
+function deleteList(id) {
+  state.lists = state.lists.filter(l => l.id !== id);
+  if (!state.lists.length) newList(); else if (state.activeListId === id) state.activeListId = state.lists[0].id;
+  save(); renderLists();
+}
+$('l-new').onclick = () => {
+  const name = prompt('Namn på den nya listan:', 'Vecka ' + isoWeek());
+  if (name && name.trim()) { const l = newList(name.trim().slice(0, 40)); openEditor(l.id); }
+};
+
+/* ---------- editor ---------- */
+let editId = null;
+function openEditor(id) {
+  const l = state.lists.find(x => x.id === id) || active(); if (!l) return;
+  editId = l.id; $('ed-name').textContent = l.name;
+  const rows = $('ed-rows'); rows.innerHTML = '';
+  for (let i = 0; i < MAX_WORDS; i++) {
+    const w = l.words[i] || { en: '', sv: '' };
+    const r = document.createElement('div'); r.className = 'erow';
+    r.innerHTML = `<span class="n">${i + 1}</span><input type="text" class="en" placeholder="apple" autocomplete="off" autocapitalize="off" spellcheck="false"><input type="text" class="sv" placeholder="äpple" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="del" title="Ta bort ordet">🗑</button>`;
+    r.querySelector('.en').value = w.en; r.querySelector('.sv').value = w.sv;
+    r.querySelector('.del').onclick = () => { r.querySelector('.en').value = ''; r.querySelector('.sv').value = ''; editorSync(); };
+    rows.appendChild(r);
+  }
+  show('editor'); editorSync(false);
+}
+function editorSync(persist = true) {
+  const l = state.lists.find(x => x.id === editId); if (!l) return;
+  const words = []; let incomplete = 0, dupes = 0; const seen = new Set();
+  document.querySelectorAll('#ed-rows .erow').forEach(r => {
+    const en = r.querySelector('.en'), sv = r.querySelector('.sv');
+    const a = en.value.trim(), b = sv.value.trim();
+    en.classList.remove('bad'); sv.classList.remove('bad');
+    if (a && b) {
+      if (seen.has(norm(a))) { dupes++; en.classList.add('bad'); } seen.add(norm(a));
+      words.push({ id: uid(), en: a, sv: b });
+    } else if (a || b) { incomplete++; (a ? sv : en).classList.add('bad'); }
+  });
+  if (persist) { l.words = words; save(); }
+  const st = $('ed-status');
+  st.style.color = (incomplete || dupes) ? 'var(--red)' : 'var(--green)';
+  st.textContent = `${words.length} / ${MAX_WORDS} ord` + (incomplete ? ' · Fyll i båda fälten på de röda raderna' : '') + (dupes ? ' · Samma engelska ord finns två gånger' : '');
+}
+$('ed-rows').addEventListener('input', () => editorSync());
+$('ed-back').onclick = () => show('lists');
+$('ed-done').onclick = () => { editorSync(); state.activeListId = editId; save(); show('home'); };
+$('ed-rename').onclick = () => {
+  const l = state.lists.find(x => x.id === editId);
+  const n = prompt('Nytt namn:', l.name);
+  if (n && n.trim()) { l.name = n.trim().slice(0, 40); save(); $('ed-name').textContent = l.name; }
+};
+
+/* ---------- quiz ---------- */
+let Q = null;
+document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => startQuiz(b.dataset.dir));
+function startQuiz(dir) {
+  const l = active();
+  const items = shuffle(l.words.map(w => ({ w, dir: dir === 'mix' ? (Math.random() < .5 ? 'sv2en' : 'en2sv') : dir })));
+  Q = { dir, queue: items, total: items.length, done: 0, score: 0, firstTry: 0, cur: null, hints: 0, tries: 0, locked: false };
+  show('quiz'); nextQ();
+}
+function nextQ() {
+  if (!Q.queue.length) return finishQuiz();
+  Q.cur = Q.queue[0]; Q.hints = 0; Q.tries = 0; Q.locked = false;
+  const { w, dir } = Q.cur, card = $('q-card');
+  card.className = 'prompt-card ' + (dir === 'sv2en' ? 'sv' : 'en');
+  card.innerHTML = `<small>${dir === 'sv2en' ? 'Vad heter det på engelska?' : 'Vad heter det på svenska?'}</small>`;
+  card.appendChild(document.createTextNode(dir === 'sv2en' ? w.sv : w.en));
+  $('q-input').value = ''; $('q-input').disabled = false; $('q-hint').textContent = ''; $('q-feedback').textContent = ''; $('q-feedback').className = '';
+  $('q-hintbtn').disabled = false; $('q-check').disabled = false;
+  $('q-speak').style.visibility = dir === 'en2sv' ? 'visible' : 'hidden';
+  $('q-input').focus();
+  updateQHud();
+  if (dir === 'en2sv') speak(w.en);
+}
+function updateQHud() {
+  $('q-bar').style.width = (Q.done / Q.total * 100) + '%';
+  $('q-count').textContent = `Ord ${Math.min(Q.done + 1, Q.total)} av ${Q.total}`;
+  $('q-score').textContent = '⭐ ' + Q.score;
+}
+function targetText() { return Q.cur.dir === 'sv2en' ? Q.cur.w.en : Q.cur.w.sv; }
+function checkQ() {
+  if (Q.locked) return;
+  const val = norm($('q-input').value); if (!val) return;
+  const fb = $('q-feedback');
+  if (answers(targetText()).includes(val)) {
+    Q.locked = true; sfx.ok();
+    const pts = Q.tries === 0 ? (Q.hints === 0 ? 10 : Q.hints === 1 ? 7 : 5) : 3;
+    Q.score += pts; if (Q.tries === 0) Q.firstTry++;
+    Q.done++; Q.queue.shift();
+    fb.className = 'ok'; fb.textContent = '✓ Rätt! +' + pts;
+    speak(Q.cur.w.en);
+    $('q-input').disabled = true; $('q-check').disabled = true; $('q-hintbtn').disabled = true;
+    updateQHud();
+    setTimeout(nextQ, 1100);
+  } else {
+    Q.tries++; sfx.no();
+    $('q-card').classList.remove('shake'); void $('q-card').offsetWidth; $('q-card').classList.add('shake');
+    if (Q.tries === 1) { fb.className = 'no'; fb.textContent = '✗ Inte riktigt – försök igen!'; $('q-input').select(); }
+    else { // second miss: show answer, requeue at end
+      Q.locked = true; fb.className = 'no'; fb.innerHTML = '';
+      fb.append('Rätt svar: '); const b = document.createElement('b'); b.textContent = targetText().split('/')[0].trim(); fb.appendChild(b);
+      $('q-input').disabled = true; $('q-check').disabled = true; $('q-hintbtn').disabled = true;
+      Q.queue.push(Q.queue.shift()); speak(Q.cur.w.en);
+      setTimeout(nextQ, 2400);
+    }
+  }
+}
+$('q-check').onclick = checkQ;
+$('q-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkQ(); });
+$('q-speak').onclick = () => { if (Q) speak(Q.cur.w.en); $('q-input').focus(); };
+$('q-hintbtn').onclick = () => {
+  if (Q.locked) return;
+  const t = targetText().split('/')[0].trim(); Q.hints++;
+  $('q-hint').textContent = Q.hints === 1 ? t.replace(/[^ ]/g, '_').split('').join(' ').replace(/^_/, t[0]) : t.slice(0, Math.min(2, t.length)) + t.slice(2).replace(/[^ ]/g, '_');
+  $('q-input').focus();
+};
+$('q-quit').onclick = () => { if (confirm('Vill du avsluta övningen?')) show('home'); };
+function finishQuiz() {
+  const l = active(), max = Q.total * 10, pct = Q.score / max;
+  const stars = pct >= .85 ? 3 : pct >= .55 ? 2 : 1;
+  const isBest = l.best.quiz == null || Q.score > l.best.quiz;
+  if (isBest) { l.best.quiz = Q.score; save(); }
+  $('r-title').textContent = stars === 3 ? 'Fantastiskt! 🎉' : stars === 2 ? 'Bra jobbat! 👍' : 'Fortsätt öva! 💪';
+  $('r-stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+  $('r-text').innerHTML = `${Q.score} poäng av ${max}<br>${Q.firstTry} av ${Q.total} rätt på första försöket`;
+  $('r-best').textContent = isBest ? '🏆 Nytt rekord!' : '';
+  $('r-again').onclick = () => show('quizsetup'); $('r-again').textContent = 'Öva igen';
+  show('result'); sfx.win(); if (stars >= 2) confetti();
+}
+
+/* ---------- memory ---------- */
+let M = null, mTimer = null;
+function stopTimers() { clearInterval(mTimer); }
+function startMemory() {
+  stopTimers();
+  const l = active();
+  M = { words: l.words, score: 0, pairs: 0, sec: 0, sel: [], locked: false };
+  const cards = [];
+  M.words.forEach(w => { cards.push({ t: w.en, type: 'english', id: w.id }); cards.push({ t: w.sv, type: 'swedish', id: w.id }); });
+  const board = $('board'); board.innerHTML = '';
+  shuffle(cards).forEach(c => {
+    const d = document.createElement('div'); d.className = 'card ' + c.type; d.textContent = c.t;
+    d.onclick = () => onCard(d, c); board.appendChild(d);
+  });
+  mHud(); show('memory');
+  mTimer = setInterval(() => { M.sec++; mHud(); }, 1000);
+}
+function mHud() {
+  $('m-score').textContent = M.score; $('m-time').textContent = fmt(M.sec); $('m-pairs').textContent = `${M.pairs}/${M.words.length}`;
+}
+function onCard(el, c) {
+  if (M.locked || el.classList.contains('matched') || el.classList.contains('selected')) return;
+  if (!M.sel.length && c.type !== 'english') return cheer('Börja med ett vitt kort!');
+  if (M.sel.length === 1 && c.type !== 'swedish') return;
+  if (c.type === 'english') speak(c.t);
+  el.classList.add('selected'); M.sel.push({ el, c });
+  if (M.sel.length < 2) return;
+  M.locked = true; const [a, b] = M.sel;
+  if (a.c.id === b.c.id) {
+    M.score += 2; M.pairs++; sfx.ok();
+    setTimeout(() => {
+      [a.el, b.el].forEach(e => { e.classList.remove('selected'); e.classList.add('matched'); });
+      M.sel = []; M.locked = false; mHud();
+      if (M.pairs === M.words.length) memoryWin(); else cheer(CHEERS[(M.pairs - 1) % CHEERS.length]);
+    }, 350);
+  } else {
+    M.score = Math.max(0, M.score - 1); sfx.no(); mHud();
+    [a.el, b.el].forEach(e => e.classList.add('wrong'));
+    setTimeout(() => { [a.el, b.el].forEach(e => e.classList.remove('selected', 'wrong')); M.sel = []; M.locked = false; }, 800);
+  }
+}
+function memoryWin() {
+  stopTimers();
+  const l = active(), n = M.words.length;
+  const final = Math.max(0, M.score * 10 - M.sec); // faster = higher
+  const isBest = l.best.memory == null || final > l.best.memory;
+  if (isBest) { l.best.memory = final; save(); }
+  $('r-title').textContent = 'Du klarade det! 🎉';
+  $('r-stars').textContent = '🃏🏆🃏';
+  $('r-text').innerHTML = `${n} par på ${fmt(M.sec)}<br>${final} poäng`;
+  $('r-best').textContent = isBest ? '🏆 Nytt rekord!' : '';
+  $('r-again').textContent = 'Spela igen'; $('r-again').onclick = () => startMemory();
+  setTimeout(() => { show('result'); sfx.win(); confetti(); }, 700);
+}
+$('m-restart').onclick = startMemory;
+$('m-quit').onclick = () => { stopTimers(); show('home'); };
+
+show('home');
+</script>
+</body>
+</html>

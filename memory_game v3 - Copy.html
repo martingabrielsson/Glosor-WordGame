@@ -1,0 +1,332 @@
+<h2 style="color:#fff;font-size:18px;font-weight:500;text-align:center;padding:1rem 0 0.5rem;">English-Swedish memory card matching game for children</h2>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a1628; font-family: var(--font-sans, sans-serif); min-height: 100vh; padding: 1rem; }
+
+  .screen { display: none; max-width: 640px; margin: 0 auto; padding: 0.5rem 0; }
+  #setup-screen { display: block; }
+
+  #setup-screen h1 { color: #fff; font-size: 22px; font-weight: 500; margin-bottom: 0.5rem; text-align: center; }
+  #setup-screen .subtitle { color: #4a7bd4; font-size: 13px; text-align: center; margin-bottom: 4px; font-weight: 500; letter-spacing: 0.04em; }
+  #setup-screen p { color: #8ca4cc; font-size: 14px; text-align: center; margin-bottom: 1.5rem; }
+  .col-labels { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 6px; }
+  .col-labels span { font-size: 12px; color: #4a6690; text-align: center; letter-spacing: 0.05em; }
+  .word-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .word-row input { padding: 8px 10px; border-radius: 8px; border: 0.5px solid #2a3f66; background: #0f2040; color: #fff; font-size: 14px; width: 100%; outline: none; }
+  .word-row input:focus { border-color: #4a7bd4; }
+  .word-row input::placeholder { color: #3d5278; }
+  #error-msg { color: #f09595; font-size: 13px; text-align: center; margin-top: 8px; min-height: 18px; }
+
+  .btn-row { display: flex; gap: 8px; justify-content: center; margin-top: 1.2rem; flex-wrap: wrap; }
+  .btn-clear { padding: 10px 20px; background: transparent; border: 0.5px solid #2a3f66; color: #8ca4cc; border-radius: 10px; font-size: 14px; cursor: pointer; }
+  .btn-clear:hover { border-color: #4a7bd4; color: #fff; }
+  .btn-start-mem { padding: 10px 20px; background: #2a5ab8; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-start-mem:hover { background: #3468cc; }
+  .btn-start-en { padding: 10px 20px; background: #1d7a3a; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-start-en:hover { background: #22913f; }
+  .btn-start-sv { padding: 10px 20px; background: #b8860b; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-start-sv:hover { background: #d4a017; }
+
+  /* Game screen */
+  #game-screen { max-width: 760px; }
+  #hud { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px; }
+  .hud-box { background: #0f2040; border: 0.5px solid #2a3f66; border-radius: 8px; padding: 6px 14px; color: #fff; font-size: 14px; }
+  .hud-box span { color: #8ca4cc; font-size: 12px; display: block; }
+  .btn-hud { padding: 8px 18px; background: transparent; border: 0.5px solid #2a3f66; color: #8ca4cc; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  .btn-hud:hover { border-color: #4a7bd4; color: #fff; }
+  #board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .card { height: 90px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; text-align: center; padding: 8px; line-height: 1.3; transition: transform 0.12s, opacity 0.2s; user-select: none; border: 2px solid transparent; }
+  .card:hover:not(.matched):not(.flipped-wrong) { transform: scale(1.04); }
+  .card.english { background: #ffffff; color: #111; border-color: #ddd; }
+  .card.swedish { background: #111111; color: #fff; border-color: #333; }
+  .card.selected { border-color: #ffd700 !important; border-width: 4px !important; transform: scale(1.05); }
+  .card.matched { opacity: 0.38; cursor: default; border-color: #1d9e75 !important; transform: scale(1); }
+  .card.flipped-wrong { border-color: #e24b4a !important; }
+
+  /* Practice screens */
+  .practice-header { display: flex; align-items: center; gap: 12px; margin-bottom: 1.2rem; }
+  .practice-header h2 { color: #fff; font-size: 18px; font-weight: 500; flex: 1; }
+  .practice-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
+  .practice-card { border-radius: 10px; padding: 12px 14px; font-size: 15px; font-weight: 500; text-align: center; }
+  .practice-card.english { background: #ffffff; color: #111; }
+  .practice-card.swedish { background: #111111; color: #fff; border: 1px solid #333; }
+  .practice-input { padding: 10px 12px; border-radius: 10px; border: 2px solid #2a3f66; background: #0f2040; color: #fff; font-size: 15px; width: 100%; outline: none; transition: border-color 0.15s; }
+  .practice-input:focus { border-color: #4a7bd4; }
+  .practice-input.correct { border-color: #1d9e75 !important; background: #0a2a1e; }
+  .practice-input.wrong { border-color: #e24b4a !important; background: #2a0f0f; }
+  .practice-check-btn { display: block; margin: 1.2rem auto 0; padding: 11px 36px; background: #2a5ab8; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; }
+  .practice-check-btn:hover { background: #3468cc; }
+  .practice-result { text-align: center; margin-top: 1rem; font-size: 15px; color: #8ca4cc; min-height: 22px; }
+  .practice-result .correct-count { color: #1d9e75; font-weight: 500; }
+  .practice-result .wrong-count { color: #e24b4a; font-weight: 500; }
+
+  /* Win / cheer */
+  #win-screen { text-align: center; padding: 2rem 0; }
+  #win-screen h2 { color: #fff; font-size: 26px; font-weight: 500; margin-bottom: 0.5rem; }
+  #win-screen p { color: #8ca4cc; font-size: 15px; margin-bottom: 1.5rem; }
+  .btn-play-again { padding: 12px 36px; background: #2a5ab8; color: #fff; border: none; border-radius: 10px; font-size: 16px; cursor: pointer; }
+  .btn-play-again:hover { background: #3468cc; }
+  #cheer-banner { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: #0f2040; border: 2px solid #4a7bd4; border-radius: 16px; padding: 1.5rem 2.5rem; text-align: center; z-index: 100; }
+  #cheer-banner p { color: #fff; font-size: 20px; font-weight: 500; }
+  #cheer-banner small { color: #8ca4cc; font-size: 13px; display: block; margin-top: 4px; }
+</style>
+
+<!-- SETUP -->
+<div id="setup-screen" class="screen">
+  <p class="subtitle">THIS GAME IS FOR YOU</p>
+  <h1>Alice</h1>
+  <p>Enter word pairs to play — English on the left, Swedish on the right.</p>
+  <div class="col-labels"><span>ENGLISH</span><span>SWEDISH</span></div>
+  <div id="word-inputs"></div>
+  <div id="error-msg"></div>
+  <div class="btn-row">
+    <button class="btn-clear" id="clear-btn">Clear all</button>
+    <button class="btn-start-mem" id="start-btn">Start memory game</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn-start-en" id="practice-en-btn">Start game English</button>
+    <button class="btn-start-sv" id="practice-sv-btn">Start game Swedish</button>
+  </div>
+</div>
+
+<!-- MEMORY GAME -->
+<div id="game-screen" class="screen">
+  <div id="hud">
+    <div class="hud-box"><span>Score</span><strong id="score-val">0</strong></div>
+    <div class="hud-box"><span>Time</span><strong id="timer-val">0:00</strong></div>
+    <div class="hud-box"><span>Pairs found</span><strong id="pairs-val">0 / 0</strong></div>
+    <button class="btn-hud" id="restart-btn"><i class="ti ti-refresh" aria-hidden="true"></i> Restart</button>
+    <button class="btn-hud" id="back-btn"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+  </div>
+  <div id="board"></div>
+</div>
+
+<!-- PRACTICE ENGLISH (show EN card, type Swedish) -->
+<div id="practice-en-screen" class="screen">
+  <div class="practice-header">
+    <button class="btn-hud" id="back-pen-btn"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+    <h2>Write the Swedish translation</h2>
+  </div>
+  <div id="pen-rows"></div>
+  <button class="practice-check-btn" id="pen-check-btn">Check answers</button>
+  <div class="practice-result" id="pen-result"></div>
+</div>
+
+<!-- PRACTICE SWEDISH (show SV card, type English) -->
+<div id="practice-sv-screen" class="screen">
+  <div class="practice-header">
+    <button class="btn-hud" id="back-psv-btn"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+    <h2>Write the English translation</h2>
+  </div>
+  <div id="psv-rows"></div>
+  <button class="practice-check-btn" id="psv-check-btn">Check answers</button>
+  <div class="practice-result" id="psv-result"></div>
+</div>
+
+<!-- WIN -->
+<div id="win-screen" class="screen">
+  <h2>You won! 🎉</h2>
+  <p id="win-msg"></p>
+  <button class="btn-play-again" id="play-again-btn">Play Again</button>
+</div>
+
+<div id="cheer-banner" role="status" aria-live="polite">
+  <p id="cheer-text"></p>
+  <small id="cheer-sub"></small>
+</div>
+
+<script>
+const cheers = [
+  ["Fantastic!","Great match!"],["Superb!","Keep going!"],["Brilliant!","You're on fire!"],
+  ["Amazing!","Perfect pair!"],["Well done!","One more step closer!"],["Excellent!","You rock!"],
+  ["Outstanding!","Incredible memory!"],["Wow!","That was fast!"],["Great job!","Nothing can stop you!"],
+  ["Perfecto!","You nailed it!"]
+];
+
+let words=[], score=0, pairs=0, timerSec=0, timerInterval=null, selected=[], locked=false;
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.style.display='none');
+  document.getElementById(id).style.display='block';
+}
+
+function buildInputs() {
+  const c = document.getElementById('word-inputs');
+  for (let i=0;i<10;i++) {
+    const row=document.createElement('div'); row.className='word-row';
+    row.innerHTML=`<input type="text" placeholder="e.g. apple" data-idx="${i}" data-lang="en" autocomplete="off">
+                   <input type="text" placeholder="e.g. äpple" data-idx="${i}" data-lang="sv" autocomplete="off">`;
+    c.appendChild(row);
+  }
+}
+
+function getWords() {
+  const enInputs=document.querySelectorAll('[data-lang="en"]');
+  const svInputs=document.querySelectorAll('[data-lang="sv"]');
+  const w=[]; let hasSingle=false;
+  for (let i=0;i<10;i++) {
+    const en=enInputs[i].value.trim(), sv=svInputs[i].value.trim();
+    if (en&&sv) w.push({en,sv,id:i});
+    else if (en||sv) hasSingle=true;
+  }
+  return {w, hasSingle};
+}
+
+function validate() {
+  const {w,hasSingle}=getWords();
+  if (hasSingle) { document.getElementById('error-msg').textContent='Every English word needs a Swedish translation (and vice versa). Please complete or clear incomplete pairs.'; return null; }
+  if (w.length<2) { document.getElementById('error-msg').textContent='Please enter at least 2 word pairs to start.'; return null; }
+  document.getElementById('error-msg').textContent=''; return w;
+}
+
+document.getElementById('clear-btn').addEventListener('click',()=>{
+  document.querySelectorAll('#word-inputs input').forEach(i=>i.value='');
+  document.getElementById('error-msg').textContent='';
+});
+
+document.getElementById('start-btn').addEventListener('click',()=>{
+  const w=validate(); if (!w) return; words=w; startGame();
+});
+
+document.getElementById('back-btn').addEventListener('click',()=>{ clearInterval(timerInterval); show('setup-screen'); });
+document.getElementById('restart-btn').addEventListener('click',startGame);
+document.getElementById('play-again-btn').addEventListener('click',()=>show('setup-screen'));
+
+// MEMORY GAME
+function startGame() {
+  score=0; pairs=0; timerSec=0; selected=[]; locked=false;
+  updateHUD(); clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{ timerSec++; updateHUD(); },1000);
+  show('game-screen'); buildBoard();
+}
+
+function updateHUD() {
+  document.getElementById('score-val').textContent=score;
+  const m=Math.floor(timerSec/60),s=timerSec%60;
+  document.getElementById('timer-val').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+  document.getElementById('pairs-val').textContent=`${pairs} / ${words.length}`;
+}
+
+function buildBoard() {
+  const board=document.getElementById('board'); board.innerHTML='';
+  const cards=[];
+  words.forEach(w=>{ cards.push({text:w.en,type:'english',id:w.id}); cards.push({text:w.sv,type:'swedish',id:w.id}); });
+  cards.sort(()=>Math.random()-0.5);
+  cards.forEach(c=>{
+    const div=document.createElement('div'); div.className=`card ${c.type}`;
+    div.textContent=c.text; div.dataset.id=c.id; div.dataset.type=c.type;
+    div.addEventListener('click',()=>onCardClick(div,c)); board.appendChild(div);
+  });
+}
+
+function pronounce(word) {
+  const u=new SpeechSynthesisUtterance(word); u.lang='en-US';
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+function onCardClick(el,card) {
+  if (locked||el.classList.contains('matched')||el.classList.contains('selected')) return;
+  if (selected.length===0&&card.type!=='english') return;
+  if (selected.length===1&&card.type!=='swedish') return;
+  if (card.type==='english') pronounce(card.text);
+  el.classList.add('selected'); selected.push({el,card});
+  if (selected.length===2) {
+    locked=true; const [a,b]=selected;
+    if (a.card.id===b.card.id&&a.card.type!==b.card.type) {
+      score+=2; pairs++;
+      setTimeout(()=>{
+        a.el.classList.remove('selected'); b.el.classList.remove('selected');
+        a.el.classList.add('matched'); b.el.classList.add('matched');
+        updateHUD(); selected=[]; locked=false;
+        showCheer(pairs-1);
+        if (pairs===words.length) setTimeout(showWin,1200);
+      },400);
+    } else {
+      score=Math.max(0,score-1);
+      a.el.classList.add('flipped-wrong'); b.el.classList.add('flipped-wrong');
+      updateHUD();
+      setTimeout(()=>{
+        a.el.classList.remove('selected','flipped-wrong'); b.el.classList.remove('selected','flipped-wrong');
+        selected=[]; locked=false;
+      },900);
+    }
+  }
+}
+
+function showCheer(idx) {
+  const [main,sub]=cheers[idx%cheers.length];
+  const banner=document.getElementById('cheer-banner');
+  document.getElementById('cheer-text').textContent=main;
+  document.getElementById('cheer-sub').textContent=sub;
+  banner.style.display='block';
+  clearTimeout(banner._t); banner._t=setTimeout(()=>banner.style.display='none',1400);
+}
+
+function showWin() {
+  clearInterval(timerInterval);
+  const m=Math.floor(timerSec/60),s=timerSec%60;
+  document.getElementById('win-msg').textContent=`Score: ${score} points · Time: ${m}:${s.toString().padStart(2,'0')}`;
+  show('win-screen');
+}
+
+// PRACTICE ENGLISH — show EN card, type Swedish
+document.getElementById('practice-en-btn').addEventListener('click',()=>{
+  const w=validate(); if (!w) return; words=w;
+  const cont=document.getElementById('pen-rows'); cont.innerHTML='';
+  words.forEach(word=>{
+    const row=document.createElement('div'); row.className='practice-row';
+    row.innerHTML=`<div class="practice-card english">${word.en}</div>
+                   <input class="practice-input" type="text" placeholder="Swedish translation…" data-answer="${word.sv.toLowerCase()}" autocomplete="off">`;
+    cont.appendChild(row);
+  });
+  document.getElementById('pen-result').innerHTML='';
+  document.querySelectorAll('#pen-rows .practice-input').forEach(i=>{ i.classList.remove('correct','wrong'); i.disabled=false; });
+  show('practice-en-screen');
+});
+
+document.getElementById('pen-check-btn').addEventListener('click',()=>{
+  let correct=0, wrong=0;
+  document.querySelectorAll('#pen-rows .practice-input').forEach(inp=>{
+    const val=inp.value.trim().toLowerCase(), ans=inp.dataset.answer;
+    inp.classList.remove('correct','wrong');
+    if (val===ans) { inp.classList.add('correct'); correct++; }
+    else { inp.classList.add('wrong'); wrong++; }
+  });
+  document.getElementById('pen-result').innerHTML=
+    `<span class="correct-count">${correct} correct</span> · <span class="wrong-count">${wrong} wrong</span>`;
+});
+
+document.getElementById('back-pen-btn').addEventListener('click',()=>show('setup-screen'));
+
+// PRACTICE SWEDISH — show SV card, type English
+document.getElementById('practice-sv-btn').addEventListener('click',()=>{
+  const w=validate(); if (!w) return; words=w;
+  const cont=document.getElementById('psv-rows'); cont.innerHTML='';
+  words.forEach(word=>{
+    const row=document.createElement('div'); row.className='practice-row';
+    row.innerHTML=`<div class="practice-card swedish">${word.sv}</div>
+                   <input class="practice-input" type="text" placeholder="English translation…" data-answer="${word.en.toLowerCase()}" autocomplete="off">`;
+    cont.appendChild(row);
+  });
+  document.getElementById('psv-result').innerHTML='';
+  document.querySelectorAll('#psv-rows .practice-input').forEach(i=>{ i.classList.remove('correct','wrong'); i.disabled=false; });
+  show('practice-sv-screen');
+});
+
+document.getElementById('psv-check-btn').addEventListener('click',()=>{
+  let correct=0, wrong=0;
+  document.querySelectorAll('#psv-rows .practice-input').forEach(inp=>{
+    const val=inp.value.trim().toLowerCase(), ans=inp.dataset.answer;
+    inp.classList.remove('correct','wrong');
+    if (val===ans) { inp.classList.add('correct'); correct++; }
+    else { inp.classList.add('wrong'); wrong++; }
+  });
+  document.getElementById('psv-result').innerHTML=
+    `<span class="correct-count">${correct} correct</span> · <span class="wrong-count">${wrong} wrong</span>`;
+});
+
+document.getElementById('back-psv-btn').addEventListener('click',()=>show('setup-screen'));
+
+buildInputs();
+</script>
