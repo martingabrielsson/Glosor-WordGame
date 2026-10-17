@@ -51,6 +51,10 @@
   .listrow .info { flex: 1; min-width: 160px; }
   .listrow .info b { font-size: 19px; }
   .listrow.active { outline: 3px solid var(--purple); }
+  .pick { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 6px 0; border: 2px solid var(--line); border-radius: 14px; cursor: pointer; font-size: 18px; }
+  .pick.on { border-color: var(--purple); background: #f3edff; }
+  .pick input { width: 22px; height: 22px; accent-color: var(--purple); }
+  .pick small { margin-left: auto; color: var(--muted); }
   .badge { background: var(--yellow); color: #5a4300; border-radius: 10px; padding: 2px 8px; font-size: 13px; font-weight: 700; }
 
   /* Editor */
@@ -149,6 +153,16 @@
 <div id="quizsetup" class="screen">
   <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button></div>
   <h2>Vad vill du öva?</h2>
+  <div class="box">
+    <b>Välj glosläxor:</b>
+    <div id="qs-lists"></div>
+    <div style="margin-top:6px">
+      <button class="btn small orange" id="qs-random">🎲 Slumpa en vecka</button>
+      <button class="btn small ghost" id="qs-all">Välj alla</button>
+      <button class="btn small ghost" id="qs-none">Rensa</button>
+    </div>
+    <div class="muted" id="qs-count" style="margin-top:6px"></div>
+  </div>
   <button class="btn" data-dir="sv2en">🇸🇪 → 🇬🇧 Se svenska, skriv engelska</button>
   <button class="btn orange" data-dir="en2sv">🇬🇧 → 🇸🇪 Se engelska, skriv svenska</button>
   <button class="btn green" data-dir="mix">🔀 Blandat</button>
@@ -229,6 +243,7 @@ function show(id) {
   $(id).classList.add('active'); window.scrollTo(0, 0);
   if (id === 'home') renderHome();
   if (id === 'lists') renderLists();
+  if (id === 'quizsetup') renderPicker();
 }
 document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) { stopTimers(); show(g.dataset.go); } });
 function answers(str) { // accepted alternatives
@@ -287,7 +302,10 @@ function needWords(min) {
   if (!l || l.words.length < min) { alert(`Lägg först in minst ${min} ord i listan!`); openEditor(l ? l.id : null); return false; }
   return true;
 }
-$('h-quiz').onclick = () => { if (needWords(1)) show('quizsetup'); };
+$('h-quiz').onclick = () => {
+  if (!state.lists.some(l => l.words.length)) { alert('Lägg först in några ord i en glosläxa!'); openEditor(active().id); return; }
+  show('quizsetup');
+};
 $('h-memory').onclick = () => { if (needWords(2)) startMemory(); };
 $('h-lists').onclick = () => show('lists');
 function renderSpeed() {
@@ -368,12 +386,47 @@ $('ed-rename').onclick = () => {
 };
 
 /* ---------- quiz ---------- */
+function quizSel() { // selected list ids that still exist; default = active list
+  let sel = (state.quizSel || []).filter(id => state.lists.some(l => l.id === id));
+  if (!sel.length && active() && active().words.length) sel = [active().id];
+  return sel;
+}
+function renderPicker() {
+  const sel = quizSel(), box = $('qs-lists'); box.innerHTML = '';
+  state.lists.forEach(l => {
+    const d = document.createElement('label'); d.className = 'pick' + (sel.includes(l.id) ? ' on' : '');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sel.includes(l.id); cb.disabled = !l.words.length;
+    cb.onchange = () => { setSel(cb.checked ? [...quizSel().filter(x => x !== l.id), l.id] : quizSel().filter(x => x !== l.id)); };
+    const n = document.createElement('span'); n.textContent = l.name;
+    const c = document.createElement('small'); c.textContent = l.words.length + ' ord';
+    d.append(cb, n, c); box.appendChild(d);
+  });
+  const total = selWords(sel).length;
+  $('qs-count').textContent = total ? `${total} ord valda` : 'Välj minst en glosläxa med ord.';
+  document.querySelectorAll('[data-dir]').forEach(b => b.disabled = !total);
+}
+function setSel(ids) { state.quizSel = ids; save(); renderPicker(); }
+function selWords(ids) {
+  const seen = new Set(), out = [];
+  state.lists.filter(l => ids.includes(l.id)).forEach(l => l.words.forEach(w => {
+    const k = norm(w.en) + '|' + norm(w.sv); if (!seen.has(k)) { seen.add(k); out.push(w); }
+  }));
+  return out;
+}
+$('qs-random').onclick = () => {
+  const ok = state.lists.filter(l => l.words.length), cur = quizSel();
+  const pool = ok.length > 1 ? ok.filter(l => !(cur.length === 1 && cur[0] === l.id)) : ok;
+  setSel([pool[Math.floor(Math.random() * pool.length)].id]);
+};
+$('qs-all').onclick = () => setSel(state.lists.filter(l => l.words.length).map(l => l.id));
+$('qs-none').onclick = () => setSel([]);
 let Q = null;
 document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => startQuiz(b.dataset.dir));
 function startQuiz(dir) {
-  const l = active();
-  const items = shuffle(l.words.map(w => ({ w, dir: dir === 'mix' ? (Math.random() < .5 ? 'sv2en' : 'en2sv') : dir })));
-  Q = { dir, queue: items, total: items.length, done: 0, score: 0, firstTry: 0, cur: null, hints: 0, tries: 0, locked: false };
+  const ids = quizSel(), words = selWords(ids);
+  if (!words.length) return;
+  const items = shuffle(words.map(w => ({ w, dir: dir === 'mix' ? (Math.random() < .5 ? 'sv2en' : 'en2sv') : dir })));
+  Q = { listIds: ids, dir, queue: items, total: items.length, done: 0, score: 0, firstTry: 0, cur: null, hints: 0, tries: 0, locked: false };
   show('quiz'); nextQ();
 }
 function nextQ() {
@@ -434,14 +487,15 @@ $('q-hintbtn').onclick = () => {
 };
 $('q-quit').onclick = () => { if (confirm('Vill du avsluta övningen?')) show('home'); };
 function finishQuiz() {
-  const l = active(), max = Q.total * 10, pct = Q.score / max;
+  const only = Q.listIds.length === 1 ? state.lists.find(x => x.id === Q.listIds[0]) : null;
+  const l = only || { best: {} }, max = Q.total * 10, pct = Q.score / max;
   const stars = pct >= .85 ? 3 : pct >= .55 ? 2 : 1;
   const isBest = l.best.quiz == null || Q.score > l.best.quiz;
-  if (isBest) { l.best.quiz = Q.score; save(); }
+  if (isBest) { l.best.quiz = Q.score; if (only) save(); }
   $('r-title').textContent = stars === 3 ? 'Fantastiskt! 🎉' : stars === 2 ? 'Bra jobbat! 👍' : 'Fortsätt öva! 💪';
   $('r-stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
   $('r-text').innerHTML = `${Q.score} poäng av ${max}<br>${Q.firstTry} av ${Q.total} rätt på första försöket`;
-  $('r-best').textContent = isBest ? '🏆 Nytt rekord!' : '';
+  $('r-best').textContent = isBest && only ? '🏆 Nytt rekord!' : '';
   $('r-again').onclick = () => show('quizsetup'); $('r-again').textContent = 'Öva igen';
   show('result'); sfx.win(); if (stars >= 2) confetti();
 }
