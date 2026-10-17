@@ -159,6 +159,31 @@
   <div style="text-align:center">
     <button class="btn ghost small" id="h-mute"></button>
     <button class="btn ghost small" id="h-speed"></button>
+    <button class="btn ghost small" id="h-sync">☁️ Synka enheter</button>
+  </div>
+</div>
+
+<!-- SYNC -->
+<div id="syncscreen" class="screen">
+  <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button></div>
+  <h2>Synka mellan enheter</h2>
+  <div class="box" id="sy-off" style="display:none">
+    <p>Synkningen är inte påslagen än. En vuxen behöver koppla appen till en gratis molntjänst en gång (se <b>SYNC_SETUP.md</b>).</p>
+  </div>
+  <div class="box" id="sy-join" style="display:none">
+    <p><b>Första enheten:</b> skapa en kod.</p>
+    <button class="btn" id="sy-new">✨ Skapa ny kod</button>
+    <p style="margin-top:14px"><b>Har du redan en kod?</b> Skriv den här:</p>
+    <input type="text" id="sy-input" placeholder="ABCD-EFGH-JKLM" autocomplete="off" autocapitalize="characters" spellcheck="false" style="margin:8px 0">
+    <button class="btn green" id="sy-connect">Anslut</button>
+    <div id="sy-error" style="color:var(--red);font-weight:700;text-align:center;min-height:22px"></div>
+  </div>
+  <div class="box" id="sy-on" style="display:none">
+    <p style="text-align:center">Skriv in den här koden på de andra enheterna:</p>
+    <div id="sy-code" style="text-align:center;font-size:30px;font-weight:800;letter-spacing:2px;color:var(--purple-d);margin:8px 0"></div>
+    <div class="muted" id="sy-status" style="text-align:center;min-height:22px"></div>
+    <button class="btn" id="sy-now">🔄 Synka nu</button>
+    <button class="btn ghost" id="sy-leave">Koppla från den här enheten</button>
   </div>
 </div>
 
@@ -315,6 +340,9 @@
 <script>
 'use strict';
 const KEY = 'glosor.v1', MAX_WORDS = 20, MEM_MAX = 20, BASE_RATE = 0.85; // speed 100% = BASE_RATE
+// Cloud sync between devices: fill in from your Firebase project (see SYNC_SETUP.md). Empty = sync off.
+const SYNC_CFG = { apiKey: '', projectId: '' };
+let syncTimer = null, syncBusy = false, syncStatus = '';
 const CHEERS = ['Fantastiskt!','Superbra!','Grymt!','Snyggt!','Bra jobbat!','Toppen!','Wow!','Perfekt!','Du är bäst!','Heja!'];
 
 /* ---------- storage ---------- */
@@ -323,7 +351,8 @@ function load() {
   try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.lists)) return s; } catch (e) {}
   return { lists: [], activeListId: null, muted: false };
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function saveLocal() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function save() { saveLocal(); scheduleSync(); }
 const uid = () => Math.random().toString(36).slice(2, 9);
 function isoWeek(d = new Date()) {
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -331,11 +360,12 @@ function isoWeek(d = new Date()) {
   return Math.ceil(((t - new Date(Date.UTC(t.getUTCFullYear(), 0, 1))) / 864e5 + 1) / 7);
 }
 function newList(name) {
-  const l = { id: uid(), name: name || ('Vecka ' + isoWeek()), words: [], best: {} };
+  const l = { id: uid(), name: name || ('Vecka ' + isoWeek()), words: [], best: {}, updated: Date.now(), auto: !name };
   state.lists.push(l); state.activeListId = l.id; save(); return l;
 }
 function active() { return state.lists.find(l => l.id === state.activeListId) || null; }
 if (!state.lists.length) newList();
+state.lists.forEach(l => { if (!l.updated) l.updated = Date.now(); });
 if (!active()) { state.activeListId = state.lists[0].id; save(); }
 
 /* ---------- helpers ---------- */
@@ -344,6 +374,7 @@ const norm = s => s.toLowerCase().replace(/\s+/g, ' ').trim();
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 function show(id) {
+  if (id !== 'editor') scheduleSync(1500);
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active'); window.scrollTo(0, 0);
   if (id === 'home') renderHome();
@@ -470,6 +501,7 @@ function renderLists() {
   });
 }
 function deleteList(id) {
+  (state.deletedLists = state.deletedLists || {})[id] = Date.now();
   state.lists = state.lists.filter(l => l.id !== id);
   if (!state.lists.length) newList(); else if (state.activeListId === id) state.activeListId = state.lists[0].id;
   save(); renderLists();
@@ -508,7 +540,9 @@ function editorSync(persist = true) {
       words.push({ id: uid(), en: a, sv: b });
     } else if (a || b) { incomplete++; (a ? sv : en).classList.add('bad'); }
   });
-  if (persist) { l.words = words; save(); }
+  if (persist && JSON.stringify(l.words.map(w => [w.en, w.sv])) !== JSON.stringify(words.map(w => [w.en, w.sv]))) {
+    l.words = words; l.updated = Date.now(); if (words.length) l.auto = false; save();
+  }
   const st = $('ed-status');
   st.style.color = (incomplete || dupes) ? 'var(--red)' : 'var(--green)';
   st.textContent = `${words.length} / ${MAX_WORDS} ord` + (incomplete ? ' · Fyll i båda fälten på de röda raderna' : '') + (dupes ? ' · Samma engelska ord finns två gånger' : '');
@@ -519,7 +553,7 @@ $('ed-done').onclick = () => { editorSync(); state.activeListId = editId; save()
 $('ed-rename').onclick = () => {
   const l = state.lists.find(x => x.id === editId);
   const n = prompt('Nytt namn:', l.name);
-  if (n && n.trim()) { l.name = n.trim().slice(0, 40); save(); $('ed-name').textContent = l.name; }
+  if (n && n.trim()) { l.name = n.trim().slice(0, 40); l.updated = Date.now(); l.auto = false; save(); $('ed-name').textContent = l.name; }
 };
 
 /* ---------- quiz ---------- */
@@ -649,7 +683,7 @@ function finishQuiz() {
   const l = only || { best: {} }, max = Q.total * 10, pct = Q.score / max;
   const stars = pct >= .85 ? 3 : pct >= .55 ? 2 : 1;
   const isBest = l.best.quiz == null || Q.score > l.best.quiz;
-  if (isBest) { l.best.quiz = Q.score; if (only) save(); }
+  if (isBest) { l.best.quiz = Q.score; if (only) { l.updated = Date.now(); save(); } }
   $('r-title').textContent = stars === 3 ? 'Fantastiskt! 🎉' : stars === 2 ? 'Bra jobbat! 👍' : 'Fortsätt öva! 💪';
   $('r-stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
   $('r-text').innerHTML = `${Q.score} poäng av ${max}<br>${Q.firstTry} av ${Q.total} rätt på första försöket`;
@@ -705,7 +739,7 @@ function memoryWin() {
   const l = state.lists.find(x => x.id === M.listId) || { best: {} }, n = M.words.length;
   const final = Math.max(0, M.score * 10 - M.sec); // faster = higher
   const isBest = l.best.memory == null || final > l.best.memory;
-  if (isBest) { l.best.memory = final; if (M.listId) save(); }
+  if (isBest) { l.best.memory = final; if (M.listId) { l.updated = Date.now(); save(); } }
   $('r-title').textContent = 'Du klarade det! 🎉';
   $('r-stars').textContent = '🃏🏆🃏';
   $('r-text').innerHTML = `${n} par på ${fmt(M.sec)}<br>${final} poäng`;
@@ -884,6 +918,122 @@ function finishEv() {
   $('r-again').textContent = 'Nya ord'; $('r-again').onclick = () => startEv(lastEv.sec, lastEv.mine);
   show('result'); sfx.win(); if (stars >= 2) confetti();
 }
+
+/* ---------- sync between devices (Firebase Firestore, family code) ---------- */
+function syncReady() { return !!(SYNC_CFG.apiKey && SYNC_CFG.projectId && state.sync && state.sync.code); }
+function scheduleSync(ms = 2500) {
+  if (!syncReady()) return;
+  clearTimeout(syncTimer); syncTimer = setTimeout(() => syncNow(), ms);
+}
+function snapshot() { // what is shared between devices
+  return {
+    lists: state.lists.map(l => ({ id: l.id, name: l.name, words: l.words, best: l.best || {}, updated: l.updated || 0, auto: !!l.auto })),
+    deleted: state.deletedLists || {}, everyday: state.everyday || {}
+  };
+}
+function mergeData(a, b) { // pure: newest change per list wins, deletions stick, word progress takes the highest
+  const deleted = { ...(a.deleted || {}) };
+  for (const [id, t] of Object.entries(b.deleted || {})) deleted[id] = Math.max(deleted[id] || 0, t);
+  const byId = {};
+  [...(a.lists || []), ...(b.lists || [])].forEach(l => { const c = byId[l.id]; if (!c || (l.updated || 0) > (c.updated || 0)) byId[l.id] = l; });
+  let lists = Object.values(byId).filter(l => !deleted[l.id]);
+  if (lists.some(l => !l.auto || l.words.length)) { // drop the empty starter list when real lists exist
+    lists.filter(l => l.auto && !l.words.length).forEach(l => { deleted[l.id] = Date.now(); });
+    lists = lists.filter(l => !(l.auto && !l.words.length));
+  }
+  const everyday = { ...(a.everyday || {}) };
+  for (const [id, p] of Object.entries(b.everyday || {})) {
+    const q = everyday[id] || { ok: 0, seen: 0 };
+    everyday[id] = { ok: Math.max(q.ok, p.ok), seen: Math.max(q.seen, p.seen) };
+  }
+  return { lists, deleted, everyday };
+}
+const syncCanon = d => JSON.stringify({
+  lists: [...(d.lists || [])].sort((x, y) => x.id < y.id ? -1 : 1).map(l => [l.id, l.name, l.words.map(w => [w.en, w.sv]), l.best, l.updated || 0, !!l.auto]),
+  deleted: Object.entries(d.deleted || {}).sort(), everyday: Object.entries(d.everyday || {}).sort()
+});
+function applyMerged(m) {
+  state.lists = m.lists; state.deletedLists = m.deleted; state.everyday = m.everyday;
+  if (!state.lists.length) newList();
+  if (!active()) state.activeListId = state.lists[0].id;
+  saveLocal();
+}
+function setSyncStatus(t) { syncStatus = t; if ($('syncscreen').classList.contains('active')) renderSync(); }
+function refreshView() { // redraw the screen showing synced data (never the editor or a running game)
+  const cur = document.querySelector('.screen.active'); if (!cur) return;
+  const id = cur.id;
+  if (id === 'home') renderHome();
+  else if (id === 'lists') renderLists();
+  else if (id === 'weekview') openWeek();
+  else if (id === 'evsetup') { renderEvSetup(); renderPickers(); }
+  else if (id === 'quizsetup' || id === 'memsetup') renderPickers();
+  else if (id === 'syncscreen') renderSync();
+}
+async function syncNow() {
+  if (!syncReady() || syncBusy) return;
+  if (['editor', 'quiz', 'evround', 'memory'].some(id => $(id).classList.contains('active'))) { scheduleSync(8000); return; }
+  syncBusy = true; setSyncStatus('Synkar…');
+  const base = `https://firestore.googleapis.com/v1/projects/${SYNC_CFG.projectId}/databases/(default)/documents/families/${state.sync.code}`;
+  const key = '?key=' + encodeURIComponent(SYNC_CFG.apiKey);
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = await fetch(base + key);
+      let remote = { lists: [], deleted: {}, everyday: {} }, cond;
+      if (r.status === 200) {
+        const d = await r.json();
+        try { remote = JSON.parse(d.fields.data.stringValue); } catch (e) {}
+        cond = 'currentDocument.updateTime=' + encodeURIComponent(d.updateTime);
+      } else if (r.status === 404) cond = 'currentDocument.exists=false';
+      else throw new Error('HTTP ' + r.status);
+      const merged = mergeData(snapshot(), remote);
+      applyMerged(merged);
+      if (syncCanon(merged) === syncCanon(remote)) break; // nothing new to upload
+      const pr = await fetch(base + key + '&updateMask.fieldPaths=data&' + cond, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { data: { stringValue: JSON.stringify(merged) } } })
+      });
+      if (pr.ok) break;
+      if ((pr.status === 400 || pr.status === 409) && attempt < 2) continue; // someone else wrote meanwhile: merge again
+      throw new Error('HTTP ' + pr.status);
+    }
+    state.sync.last = Date.now(); saveLocal(); setSyncStatus('');
+  } catch (e) {
+    setSyncStatus('Ingen kontakt just nu – försöker igen senare.'); scheduleSync(30000);
+  }
+  syncBusy = false; refreshView();
+}
+function genCode() {
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(12));
+  return [0, 4, 8].map(i => [...b.slice(i, i + 4)].map(x => A[x % A.length]).join('')).join('-');
+}
+function normCode(s) { const c = s.toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length === 12 ? c.match(/.{4}/g).join('-') : null; }
+function renderSync() {
+  const cfg = !!(SYNC_CFG.apiKey && SYNC_CFG.projectId), has = !!(state.sync && state.sync.code);
+  $('sy-off').style.display = cfg ? 'none' : 'block';
+  $('sy-join').style.display = cfg && !has ? 'block' : 'none';
+  $('sy-on').style.display = cfg && has ? 'block' : 'none';
+  $('sy-code').textContent = has ? state.sync.code : '';
+  const last = has && state.sync.last ? 'Senast synkad: ' + new Date(state.sync.last).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
+  $('sy-status').textContent = syncStatus || last;
+}
+function syncConnect(code) {
+  state.sync = { code, last: 0 }; saveLocal(); $('sy-error').textContent = ''; renderSync(); syncNow();
+}
+$('h-sync').onclick = () => { renderSync(); show('syncscreen'); };
+$('sy-new').onclick = () => syncConnect(genCode());
+$('sy-connect').onclick = () => {
+  const c = normCode($('sy-input').value);
+  if (!c) { $('sy-error').textContent = 'Koden ska ha 12 tecken, t.ex. ABCD-EFGH-JKLM.'; return; }
+  syncConnect(c);
+};
+$('sy-now').onclick = () => syncNow();
+$('sy-leave').onclick = () => {
+  if (confirm('Koppla från den här enheten? Orden finns kvar här, men slutar synkas.')) { state.sync = null; saveLocal(); renderSync(); }
+};
+document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleSync(500); });
+window.addEventListener('online', () => scheduleSync(500));
+setInterval(() => scheduleSync(0), 60000);
+scheduleSync(1000);
 
 /* ---------- start-up splash (1.3 s, G spins) ---------- */
 (function () {
