@@ -65,6 +65,9 @@
   input[type=text]:focus { border-color: var(--purple); }
   input.bad { border-color: var(--red); background: #fff1f1; }
   .rd { border: none; background: var(--yellow); border-radius: 10px; font-size: 18px; height: 40px; cursor: pointer; }
+  .wvcols, .wvrow { grid-template-columns: 44px 1fr 1fr !important; }
+  .wvrow { display: grid; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 20px; }
+  .wvrow .sv { color: var(--muted); }
   .del { border: none; background: #fde8e8; color: var(--red); border-radius: 10px; font-size: 18px; height: 40px; cursor: pointer; }
   #ed-status { text-align: center; font-weight: 700; margin: 8px 0; min-height: 24px; }
   #ed-name { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 10px; }
@@ -144,9 +147,10 @@
 <div id="home" class="screen">
   <svg id="logo" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Glosor"><defs><clipPath id="glmask"><rect width="1024" height="1024" rx="229"/></clipPath><path id="gw0" d="M-60 120 q45 -14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/><path id="gw1" d="M-60 220 q45 14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/><path id="gw2" d="M-60 320 q45 -14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/><path id="gw3" d="M-60 420 q45 14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/><path id="gw4" d="M-60 520 q45 -14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/><path id="gw5" d="M-60 620 q45 14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/><path id="gw6" d="M-60 720 q45 -14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/><path id="gw7" d="M-60 820 q45 14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/><path id="gw8" d="M-60 920 q45 -14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0"/></defs><g clip-path="url(#glmask)"><rect width="1024" height="1024" fill="#d8c6f0"/><g fill="#7aa6dc" style="font-family:GlFig,sans-serif;font-weight:700;font-size:30px;letter-spacing:1px"><text><textPath href="#gw0">hej · hello · hola · bonjour · ciao · hallo · ord · word · mot · palabra · parola · glosa · vocab · hej · hello · hola</textPath></text><text><textPath href="#gw1" startOffset="-60">språk · language · langue · lingua · sprache · idioma · glosor · learn · lära · hej · hello · ciao · ord</textPath></text><text><textPath href="#gw2" startOffset="-120">tack · thanks · gracias · merci · grazie · danke · obrigado · kiitos · takk · tack · thanks · gracias · merci</textPath></text><text><textPath href="#gw3" startOffset="-30">bok · book · libro · livre · buch · ord · word · mot · palabra · glosor · bok · book · libro · livre · buch</textPath></text><text><textPath href="#gw4" startOffset="-90">vän · friend · amigo · ami · amico · freund · hus · house · casa · maison · vän · friend · amigo · ami</textPath></text><text><textPath href="#gw5" startOffset="-10">sol · sun · soleil · sole · sonne · hav · sea · mar · mer · mare · meer · sol · sun · soleil · sole</textPath></text><text><textPath href="#gw6" startOffset="-70">läsa · read · leer · lire · leggere · lesen · skriva · write · escribir · écrire · läsa · read · leer</textPath></text><text><textPath href="#gw7" startOffset="-140">glosor · vocabulary · vocabulario · vocabulaire · wortschatz · glosor · vocabulary · vocabulario</textPath></text><text><textPath href="#gw8" startOffset="-40">hej då · goodbye · adiós · au revoir · ciao · tschüss · hej då · goodbye · adiós · au revoir · ciao</textPath></text></g><text x="512" y="790" text-anchor="middle" fill="#f7ae72" stroke="#d8c6f0" stroke-width="44" stroke-linejoin="round" paint-order="stroke" style="font-family:GlCapra,serif;font-size:760px">G</text></g></svg>
   <p class="tagline">Lär dig engelska ord!</p>
-  <div class="box">
+  <div class="box" id="h-week" role="button" tabindex="0" style="cursor:pointer">
     <div class="activelist">Veckans glosor: <b id="h-list">–</b></div>
     <div class="bests" id="h-best"></div>
+    <div class="bests">Tryck för att se orden ›</div>
   </div>
   <button class="btn green" id="h-lists">📚 Mina glosläxor</button>
   <button class="btn" id="h-quiz">✏️ Öva glosor</button>
@@ -155,6 +159,17 @@
   <div style="text-align:center">
     <button class="btn ghost small" id="h-mute"></button>
     <button class="btn ghost small" id="h-speed"></button>
+  </div>
+</div>
+
+<!-- WEEK WORDS -->
+<div id="weekview" class="screen">
+  <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button><button class="btn small ghost" id="wv-edit">✎ Ändra ord</button></div>
+  <h2 id="wv-title"></h2>
+  <div class="box">
+    <div class="cols wvcols"><span></span><span>ENGELSKA</span><span>SVENSKA</span></div>
+    <div id="wv-rows"></div>
+    <p class="muted" id="wv-empty" style="text-align:center"></p>
   </div>
 </div>
 
@@ -392,6 +407,23 @@ function needWords(min) {
   if (!l || l.words.length < min) { alert(`Lägg först in minst ${min} ord i listan!`); openEditor(l ? l.id : null); return false; }
   return true;
 }
+function openWeek() {
+  const l = active(); if (!l) return;
+  $('wv-title').textContent = l.name;
+  const rows = $('wv-rows'); rows.innerHTML = '';
+  l.words.forEach(w => {
+    const r = document.createElement('div'); r.className = 'wvrow';
+    const b = document.createElement('button'); b.className = 'rd'; b.textContent = '🔊'; b.title = 'Lyssna'; b.onclick = () => speak(w.en, true);
+    const en = document.createElement('b'); en.textContent = w.en;
+    const sv = document.createElement('span'); sv.className = 'sv'; sv.textContent = w.sv;
+    r.append(b, en, sv); rows.appendChild(r);
+  });
+  $('wv-empty').textContent = l.words.length ? '' : 'Inga ord än – tryck på "Ändra ord" för att lägga till.';
+  show('weekview');
+}
+$('h-week').onclick = openWeek;
+$('h-week').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openWeek(); } };
+$('wv-edit').onclick = () => openEditor(active().id);
 $('h-quiz').onclick = () => {
   if (!state.lists.some(l => l.words.length)) { alert('Lägg först in några ord i en glosläxa!'); openEditor(active().id); return; }
   show('quizsetup');
