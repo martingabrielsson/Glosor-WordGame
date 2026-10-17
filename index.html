@@ -295,7 +295,7 @@ function renderSpeed() {
   document.querySelectorAll('#h-speed, .speedbtn').forEach(b => b.textContent = b.classList.contains('speedbtn') ? '🐢 ' + Math.round((state.speed || 1) * 100) + '%' : t);
 }
 function toggleSpeed() {
-  state.speed = (state.speed || 1) === 1 ? 0.8 : 1; save(); renderSpeed();
+  const s = state.speed || 1; state.speed = s > 0.85 ? 0.8 : s > 0.7 ? 0.6 : 1; save(); renderSpeed();
   if (Q && $('quiz').classList.contains('active')) speak(Q.cur.w.en); else speak('Hello, this is the speed');
 }
 document.querySelectorAll('#h-speed, .speedbtn').forEach(b => b.onclick = toggleSpeed);
