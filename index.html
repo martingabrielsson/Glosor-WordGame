@@ -771,7 +771,7 @@ function startEv(sec, mine) {
   const words = mine ? evMyWords() : evPick(sec);
   if (!words.length) return;
   EV = { queue: words.map(w => ({ w, retry: false })), total: words.length, done: 0, right: 0, missed: [], tries: 0, busy: false, cur: null };
-  evMode = getSR() && !navigator.standalone ? 'rec' : (window.MediaRecorder && navigator.mediaDevices ? 'record' : 'self');
+  evMode = getSR() ? 'rec' : (window.MediaRecorder && navigator.mediaDevices ? 'record' : 'self');
   show('evround'); nextEv();
 }
 function evSetNote() {
@@ -825,19 +825,26 @@ function evFallback(msg) {
 function evListen() {
   if ('speechSynthesis' in window) speechSynthesis.cancel(); // don't let the app's own voice be heard
   const r = new (getSR())(); evRec = r; r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 5;
+  let heardAudio = false, finished = false; // finished = result or error already handled
+  r.onaudiostart = () => { heardAudio = true; };
   r.onresult = e => {
+    finished = true;
     const alts = [...e.results[0]].map(a => a.transcript);
     $('ev-heard').textContent = 'Jag hörde: ' + alts[0];
     evResult(evMatch(EV.cur.w.en, alts));
   };
   r.onerror = e => {
-    if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(e.error)) evFallback('Mikrofonen fungerar inte här – du bedömer själv.');
+    finished = true;
+    if (['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported'].includes(e.error)) evFallback('Mikrofonen fungerar inte här – du bedömer själv.');
     else if (e.error === 'network') $('ev-heard').textContent = 'Ingen kontakt med röstigenkänningen (behöver internet).';
     else if (e.error !== 'aborted') $('ev-heard').textContent = 'Jag hörde inget – försök igen!';
   };
-  r.onend = () => $('ev-mic').classList.remove('on');
+  r.onend = () => { // ended without audio, result or error = listening isn't really supported here
+    $('ev-mic').classList.remove('on');
+    if (!finished && !heardAudio) evFallback('Det går inte att lyssna här – du bedömer själv.');
+  };
   $('ev-heard').textContent = 'Jag lyssnar…'; $('ev-mic').classList.add('on');
-  try { r.start(); } catch (e) { $('ev-mic').classList.remove('on'); }
+  try { r.start(); } catch (e) { $('ev-mic').classList.remove('on'); evFallback('Det går inte att lyssna här – du bedömer själv.'); }
 }
 async function evRecord() { // fallback: record yourself, then hear yourself and the model voice
   if (evMedia && evMedia.state === 'recording') { evMedia.stop(); return; }
