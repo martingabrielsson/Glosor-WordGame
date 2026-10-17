@@ -218,6 +218,18 @@
   <h2>Bra ord att kunna!</h2>
   <p class="muted" style="text-align:center;margin-bottom:8px">Läs och lyssna på ordet – säg det sedan högt!</p>
   <button class="btn pink" id="evs-random">🎲 10 slumpade ord</button>
+  <button class="btn green" id="evm-open">📚 Mina glosläxor</button>
+  <div class="box" id="evm-box" style="display:none">
+    <b>Välj glosläxor att öva på:</b>
+    <div id="evm-lists"></div>
+    <div style="margin-top:6px">
+      <button class="btn small orange" id="evm-random">🎲 Slumpa en vecka</button>
+      <button class="btn small ghost" id="evm-all">Välj alla</button>
+      <button class="btn small ghost" id="evm-none">Rensa</button>
+    </div>
+    <div class="muted" id="evm-count" style="margin-top:6px"></div>
+    <button class="btn pink" id="evm-start">▶ Starta med valda glosläxor</button>
+  </div>
   <div class="box"><b>Eller välj ett ämne:</b><div id="evs-topics"></div></div>
 </div>
 
@@ -321,7 +333,7 @@ function show(id) {
   $(id).classList.add('active'); window.scrollTo(0, 0);
   if (id === 'home') renderHome();
   if (id === 'lists') renderLists();
-  if (id === 'quizsetup' || id === 'memsetup') renderPickers();
+  if (id === 'quizsetup' || id === 'memsetup' || id === 'evsetup') renderPickers();
 }
 document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) { stopTimers(); show(g.dataset.go); } });
 function answers(str) { // accepted alternatives
@@ -513,6 +525,10 @@ function renderPickers() {
     const t = renderPick('quizSel', 'qs-lists', 'qs-count');
     document.querySelectorAll('[data-dir]').forEach(b => b.disabled = !t);
   }
+  if ($('evsetup').classList.contains('active') && $('evm-box').style.display !== 'none') {
+    const t = renderPick('evSel', 'evm-lists', 'evm-count');
+    $('evm-start').disabled = !t;
+  }
   if ($('memsetup').classList.contains('active')) {
     const t = renderPick('memSel', 'ms-lists', 'ms-count');
     $('ms-start').disabled = t < 2;
@@ -529,7 +545,7 @@ function wirePickerButtons(key, p) {
   $(p + '-all').onclick = () => setSel(key, state.lists.filter(l => l.words.length).map(l => l.id));
   $(p + '-none').onclick = () => setSel(key, []);
 }
-wirePickerButtons('quizSel', 'qs'); wirePickerButtons('memSel', 'ms');
+wirePickerButtons('quizSel', 'qs'); wirePickerButtons('memSel', 'ms'); wirePickerButtons('evSel', 'evm');
 let Q = null;
 document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => startQuiz(b.dataset.dir));
 function startQuiz(dir) {
@@ -689,6 +705,11 @@ function renderEvSetup() {
   });
 }
 $('h-ev').onclick = () => { renderEvSetup(); show('evsetup'); };
+$('evm-open').onclick = () => {
+  const b = $('evm-box'); b.style.display = b.style.display === 'none' ? 'block' : 'none';
+  renderPickers();
+};
+$('evm-start').onclick = () => startEv(null, true);
 $('evs-random').onclick = () => startEv(null);
 
 function evPick(sec) { // missed words first, then new, then learned; random within each group
@@ -710,9 +731,13 @@ function evMatch(target, alts) { // lenient: exact, said inside a longer phrase,
     return s === t || (' ' + s + ' ').includes(' ' + t + ' ') || (t.length >= 4 && evDist(s, t) <= 1);
   });
 }
-function startEv(sec) {
-  lastEv = sec;
-  const words = evPick(sec);
+function evMyWords() { // words from the chosen weekly glosläxor (max 20); progress is kept by English word
+  return shuffle(selWords(getSel('evSel')).map(w => ({ id: 'my:' + norm(w.en), sec: 0, en: w.en, sv: w.sv, ex: '' }))).slice(0, 20);
+}
+function startEv(sec, mine) {
+  lastEv = { sec, mine };
+  const words = mine ? evMyWords() : evPick(sec);
+  if (!words.length) return;
   EV = { queue: words.map(w => ({ w, retry: false })), total: words.length, done: 0, right: 0, missed: [], tries: 0, busy: false, cur: null };
   evMode = getSR() && !navigator.standalone ? 'rec' : (window.MediaRecorder && navigator.mediaDevices ? 'record' : 'self');
   show('evround'); nextEv();
@@ -817,7 +842,7 @@ function finishEv() {
     const b = document.createElement('b'); b.textContent = EV.missed.map(w => w.en).join(', '); $('r-text').appendChild(b);
   }
   $('r-best').textContent = '';
-  $('r-again').textContent = 'Nya ord'; $('r-again').onclick = () => startEv(lastEv);
+  $('r-again').textContent = 'Nya ord'; $('r-again').onclick = () => startEv(lastEv.sec, lastEv.mine);
   show('result'); sfx.win(); if (stars >= 2) confetti();
 }
 
