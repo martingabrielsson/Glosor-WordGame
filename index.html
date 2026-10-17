@@ -855,7 +855,7 @@ function renderEvSetup() {
     const ws = EVERYDAY.filter(w => w.sec === s), known = ws.filter(w => evLearned(w.id)).length;
     const d = document.createElement('div'); d.className = 'pick';
     const n = document.createElement('span'); n.textContent = s + '. ' + (EV_TITLES[s] || ws[0].secName);
-    const c = document.createElement('small'); c.textContent = `${known}/${ws.length} Vet Alice`;
+    const c = document.createElement('small'); c.textContent = `${known}/${ws.length} Kan Alice`;
     d.append(n, c); d.onclick = () => startEv(s); box.appendChild(d);
   });
 }
