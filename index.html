@@ -193,6 +193,28 @@
   <button class="btn ghost" data-go="home">Hem</button>
 </div>
 
+<!-- MEMORY SETUP -->
+<div id="memsetup" class="screen">
+  <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button></div>
+  <h2>The Memory Game</h2>
+  <div class="box">
+    <b>Välj glosläxor:</b>
+    <div id="ms-lists"></div>
+    <div style="margin-top:6px">
+      <button class="btn small orange" id="ms-random">🎲 Slumpa en vecka</button>
+      <button class="btn small ghost" id="ms-all">Välj alla</button>
+      <button class="btn small ghost" id="ms-none">Rensa</button>
+    </div>
+    <div class="muted" id="ms-count" style="margin-top:6px"></div>
+    <button class="btn green" id="ms-start">▶ Starta med valda glosläxor</button>
+  </div>
+  <div class="box">
+    <b>🎲 Slumpa ord från alla veckor:</b>
+    <div class="muted" id="ms-allcount" style="margin:4px 0"></div>
+    <div id="ms-rand"></div>
+  </div>
+</div>
+
 <!-- MEMORY -->
 <div id="memory" class="screen">
   <div class="topbar"><button class="btn small ghost" id="m-quit">← Hem</button><button class="btn small" id="m-restart">↻ Ny omgång</button></div>
@@ -209,7 +231,7 @@
 
 <script>
 'use strict';
-const KEY = 'glosor.v1', MAX_WORDS = 20, BASE_RATE = 0.85; // speed 100% = BASE_RATE
+const KEY = 'glosor.v1', MAX_WORDS = 20, MEM_MAX = 20, BASE_RATE = 0.85; // speed 100% = BASE_RATE
 const CHEERS = ['Fantastiskt!','Superbra!','Grymt!','Snyggt!','Bra jobbat!','Toppen!','Wow!','Perfekt!','Du är bäst!','Heja!'];
 
 /* ---------- storage ---------- */
@@ -243,7 +265,7 @@ function show(id) {
   $(id).classList.add('active'); window.scrollTo(0, 0);
   if (id === 'home') renderHome();
   if (id === 'lists') renderLists();
-  if (id === 'quizsetup') renderPicker();
+  if (id === 'quizsetup' || id === 'memsetup') renderPickers();
 }
 document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) { stopTimers(); show(g.dataset.go); } });
 function answers(str) { // accepted alternatives
@@ -306,7 +328,21 @@ $('h-quiz').onclick = () => {
   if (!state.lists.some(l => l.words.length)) { alert('Lägg först in några ord i en glosläxa!'); openEditor(active().id); return; }
   show('quizsetup');
 };
-$('h-memory').onclick = () => { if (needWords(2)) startMemory(); };
+$('h-memory').onclick = () => {
+  if (allWords().length < 2) { alert('Lägg först in minst 2 ord i en glosläxa!'); openEditor(active().id); return; }
+  show('memsetup');
+  const n = allWords().length, box = $('ms-rand'); box.innerHTML = '';
+  $('ms-allcount').textContent = `${n} ord totalt. Hur många ord vill du ha?`;
+  [6, 10, 15, 20].filter(c => c <= n).concat(n < 6 ? [n] : []).forEach(c => {
+    const b = document.createElement('button'); b.className = 'btn small orange'; b.textContent = c + ' ord';
+    b.onclick = () => startMemory(shuffle(allWords()).slice(0, c), null); box.appendChild(b);
+  });
+};
+$('ms-start').onclick = () => {
+  const ids = getSel('memSel'); let w = selWords(ids);
+  if (w.length > MEM_MAX) w = shuffle(w).slice(0, MEM_MAX);
+  startMemory(w, ids.length === 1 ? ids[0] : null);
+};
 $('h-lists').onclick = () => show('lists');
 function renderSpeed() {
   const t = '🐢 Rösthastighet: ' + Math.round((state.speed || 1) * 100) + '%';
@@ -386,26 +422,12 @@ $('ed-rename').onclick = () => {
 };
 
 /* ---------- quiz ---------- */
-function quizSel() { // selected list ids that still exist; default = active list
-  let sel = (state.quizSel || []).filter(id => state.lists.some(l => l.id === id));
+/* generic week picker: key = state field holding selected list ids */
+function getSel(key) { // selected list ids that still exist; default = active list
+  let sel = (state[key] || []).filter(id => state.lists.some(l => l.id === id));
   if (!sel.length && active() && active().words.length) sel = [active().id];
   return sel;
 }
-function renderPicker() {
-  const sel = quizSel(), box = $('qs-lists'); box.innerHTML = '';
-  state.lists.forEach(l => {
-    const d = document.createElement('label'); d.className = 'pick' + (sel.includes(l.id) ? ' on' : '');
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sel.includes(l.id); cb.disabled = !l.words.length;
-    cb.onchange = () => { setSel(cb.checked ? [...quizSel().filter(x => x !== l.id), l.id] : quizSel().filter(x => x !== l.id)); };
-    const n = document.createElement('span'); n.textContent = l.name;
-    const c = document.createElement('small'); c.textContent = l.words.length + ' ord';
-    d.append(cb, n, c); box.appendChild(d);
-  });
-  const total = selWords(sel).length;
-  $('qs-count').textContent = total ? `${total} ord valda` : 'Välj minst en glosläxa med ord.';
-  document.querySelectorAll('[data-dir]').forEach(b => b.disabled = !total);
-}
-function setSel(ids) { state.quizSel = ids; save(); renderPicker(); }
 function selWords(ids) {
   const seen = new Set(), out = [];
   state.lists.filter(l => ids.includes(l.id)).forEach(l => l.words.forEach(w => {
@@ -413,17 +435,48 @@ function selWords(ids) {
   }));
   return out;
 }
-$('qs-random').onclick = () => {
-  const ok = state.lists.filter(l => l.words.length), cur = quizSel();
-  const pool = ok.length > 1 ? ok.filter(l => !(cur.length === 1 && cur[0] === l.id)) : ok;
-  setSel([pool[Math.floor(Math.random() * pool.length)].id]);
-};
-$('qs-all').onclick = () => setSel(state.lists.filter(l => l.words.length).map(l => l.id));
-$('qs-none').onclick = () => setSel([]);
+function allWords() { return selWords(state.lists.map(l => l.id)); }
+function setSel(key, ids) { state[key] = ids; save(); renderPickers(); }
+function renderPick(key, boxId, countId) {
+  const sel = getSel(key), box = $(boxId); box.innerHTML = '';
+  state.lists.forEach(l => {
+    const d = document.createElement('label'); d.className = 'pick' + (sel.includes(l.id) ? ' on' : '');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sel.includes(l.id); cb.disabled = !l.words.length;
+    cb.onchange = () => setSel(key, cb.checked ? [...getSel(key).filter(x => x !== l.id), l.id] : getSel(key).filter(x => x !== l.id));
+    const n = document.createElement('span'); n.textContent = l.name;
+    const c = document.createElement('small'); c.textContent = l.words.length + ' ord';
+    d.append(cb, n, c); box.appendChild(d);
+  });
+  const total = selWords(sel).length;
+  $(countId).textContent = total ? `${total} ord valda` : 'Välj minst en glosläxa med ord.';
+  return total;
+}
+function renderPickers() {
+  if ($('quizsetup').classList.contains('active')) {
+    const t = renderPick('quizSel', 'qs-lists', 'qs-count');
+    document.querySelectorAll('[data-dir]').forEach(b => b.disabled = !t);
+  }
+  if ($('memsetup').classList.contains('active')) {
+    const t = renderPick('memSel', 'ms-lists', 'ms-count');
+    $('ms-start').disabled = t < 2;
+    if (t === 1) $('ms-count').textContent = 'Välj minst 2 ord.';
+    else if (t > MEM_MAX) $('ms-count').textContent += ` – ${MEM_MAX} slumpas ut`;
+  }
+}
+function wirePickerButtons(key, p) {
+  $(p + '-random').onclick = () => {
+    const ok = state.lists.filter(l => l.words.length), cur = getSel(key);
+    const pool = ok.length > 1 ? ok.filter(l => !(cur.length === 1 && cur[0] === l.id)) : ok;
+    setSel(key, [pool[Math.floor(Math.random() * pool.length)].id]);
+  };
+  $(p + '-all').onclick = () => setSel(key, state.lists.filter(l => l.words.length).map(l => l.id));
+  $(p + '-none').onclick = () => setSel(key, []);
+}
+wirePickerButtons('quizSel', 'qs'); wirePickerButtons('memSel', 'ms');
 let Q = null;
 document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => startQuiz(b.dataset.dir));
 function startQuiz(dir) {
-  const ids = quizSel(), words = selWords(ids);
+  const ids = getSel('quizSel'), words = selWords(ids);
   if (!words.length) return;
   const items = shuffle(words.map(w => ({ w, dir: dir === 'mix' ? (Math.random() < .5 ? 'sv2en' : 'en2sv') : dir })));
   Q = { listIds: ids, dir, queue: items, total: items.length, done: 0, score: 0, firstTry: 0, cur: null, hints: 0, tries: 0, locked: false };
@@ -503,10 +556,11 @@ function finishQuiz() {
 /* ---------- memory ---------- */
 let M = null, mTimer = null;
 function stopTimers() { clearInterval(mTimer); }
-function startMemory() {
+let lastMem = null;
+function startMemory(words, listId) {
   stopTimers();
-  const l = active();
-  M = { words: l.words, score: 0, pairs: 0, sec: 0, sel: [], locked: false };
+  lastMem = { words, listId };
+  M = { listId, words, score: 0, pairs: 0, sec: 0, sel: [], locked: false };
   const cards = [];
   M.words.forEach(w => { cards.push({ t: w.en, type: 'english', id: w.id }); cards.push({ t: w.sv, type: 'swedish', id: w.id }); });
   const board = $('board'); board.innerHTML = '';
@@ -543,18 +597,18 @@ function onCard(el, c) {
 }
 function memoryWin() {
   stopTimers();
-  const l = active(), n = M.words.length;
+  const l = state.lists.find(x => x.id === M.listId) || { best: {} }, n = M.words.length;
   const final = Math.max(0, M.score * 10 - M.sec); // faster = higher
   const isBest = l.best.memory == null || final > l.best.memory;
-  if (isBest) { l.best.memory = final; save(); }
+  if (isBest) { l.best.memory = final; if (M.listId) save(); }
   $('r-title').textContent = 'Du klarade det! 🎉';
   $('r-stars').textContent = '🃏🏆🃏';
   $('r-text').innerHTML = `${n} par på ${fmt(M.sec)}<br>${final} poäng`;
-  $('r-best').textContent = isBest ? '🏆 Nytt rekord!' : '';
-  $('r-again').textContent = 'Spela igen'; $('r-again').onclick = () => startMemory();
+  $('r-best').textContent = isBest && M.listId ? '🏆 Nytt rekord!' : '';
+  $('r-again').textContent = 'Spela igen'; $('r-again').onclick = () => startMemory(lastMem.words, lastMem.listId);
   setTimeout(() => { show('result'); sfx.win(); confetti(); }, 700);
 }
-$('m-restart').onclick = startMemory;
+$('m-restart').onclick = () => startMemory(lastMem.words, lastMem.listId);
 $('m-quit').onclick = () => { stopTimers(); show('home'); };
 
 show('home');
