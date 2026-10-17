@@ -119,7 +119,10 @@
   <button class="btn" id="h-quiz">✏️ Öva glosor</button>
   <button class="btn orange" id="h-memory">🃏 Memory</button>
   <button class="btn green" id="h-lists">📚 Mina ordlistor</button>
-  <button class="btn ghost small" id="h-mute" style="margin:10px auto;display:block"></button>
+  <div style="text-align:center">
+    <button class="btn ghost small" id="h-mute"></button>
+    <button class="btn ghost small" id="h-speed"></button>
+  </div>
 </div>
 
 <!-- LISTS -->
@@ -153,7 +156,7 @@
 
 <!-- QUIZ -->
 <div id="quiz" class="screen">
-  <div class="topbar"><button class="btn small ghost" id="q-quit">✕ Avsluta</button><button class="speak" id="q-speak" title="Lyssna">🔊</button></div>
+  <div class="topbar"><button class="btn small ghost" id="q-quit">✕ Avsluta</button><span><button class="btn small ghost speedbtn" title="Talhastighet"></button> <button class="speak" id="q-speak" title="Lyssna">🔊</button></span></div>
   <div class="progress"><div id="q-bar"></div></div>
   <div class="qinfo"><span id="q-count"></span><span id="q-score"></span></div>
   <div class="prompt-card" id="q-card"></div>
@@ -192,7 +195,7 @@
 
 <script>
 'use strict';
-const KEY = 'glosor.v1', MAX_WORDS = 20;
+const KEY = 'glosor.v1', MAX_WORDS = 20, BASE_RATE = 0.85; // speed 100% = BASE_RATE
 const CHEERS = ['Fantastiskt!','Superbra!','Grymt!','Snyggt!','Bra jobbat!','Toppen!','Wow!','Perfekt!','Du är bäst!','Heja!'];
 
 /* ---------- storage ---------- */
@@ -235,7 +238,7 @@ function answers(str) { // accepted alternatives
 }
 function speak(text) {
   if (state.muted || !('speechSynthesis' in window)) return;
-  try { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 0.85; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+  try { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = BASE_RATE * (state.speed || 1); speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
 }
 
 /* ---------- sound ---------- */
@@ -277,6 +280,7 @@ function renderHome() {
   if (b.memory != null) parts.push('Bästa memory: ' + b.memory + ' p');
   $('h-best').textContent = parts.join(' · ');
   $('h-mute').textContent = state.muted ? '🔇 Ljud av' : '🔊 Ljud på';
+  renderSpeed();
 }
 function needWords(min) {
   const l = active();
@@ -286,6 +290,15 @@ function needWords(min) {
 $('h-quiz').onclick = () => { if (needWords(1)) show('quizsetup'); };
 $('h-memory').onclick = () => { if (needWords(2)) startMemory(); };
 $('h-lists').onclick = () => show('lists');
+function renderSpeed() {
+  const t = '🐢 Rösthastighet: ' + Math.round((state.speed || 1) * 100) + '%';
+  document.querySelectorAll('#h-speed, .speedbtn').forEach(b => b.textContent = b.classList.contains('speedbtn') ? '🐢 ' + Math.round((state.speed || 1) * 100) + '%' : t);
+}
+function toggleSpeed() {
+  state.speed = (state.speed || 1) === 1 ? 0.8 : 1; save(); renderSpeed();
+  if (Q && $('quiz').classList.contains('active')) speak(Q.cur.w.en); else speak('Hello, this is the speed');
+}
+document.querySelectorAll('#h-speed, .speedbtn').forEach(b => b.onclick = toggleSpeed);
 $('h-mute').onclick = () => { state.muted = !state.muted; save(); renderHome(); };
 
 /* ---------- lists ---------- */
