@@ -244,7 +244,7 @@
     <div class="ev-ex" id="ev-ex"></div>
   </div>
   <div class="micwrap"><button class="mic" id="ev-mic" title="Säg ordet">🎤</button></div>
-  <div id="ev-self"><button class="btn green small" id="ev-yes">👍 Jag sa det rätt!</button><button class="btn orange small" id="ev-again">🔁 Igen</button></div>
+  <div id="ev-self"><button class="btn green small" id="ev-yes">👍 Jag sa det rätt!</button><button class="btn ghost small" id="ev-again">🔁 Igen</button></div>
   <div id="ev-heard"></div>
   <div id="ev-fb"></div>
   <div id="ev-note"></div>
@@ -402,7 +402,7 @@ $('h-memory').onclick = () => {
   const n = allWords().length, box = $('ms-rand'); box.innerHTML = '';
   $('ms-allcount').textContent = `${n} ord totalt. Hur många ord vill du ha?`;
   [6, 10, 15, 20].filter(c => c <= n).concat(n < 6 ? [n] : []).forEach(c => {
-    const b = document.createElement('button'); b.className = 'btn small orange'; b.textContent = c + ' ord';
+    const b = document.createElement('button'); b.className = 'btn small ghost'; b.textContent = c + ' ord';
     b.onclick = () => startMemory(shuffle(allWords()).slice(0, c), null); box.appendChild(b);
   });
 };
@@ -432,7 +432,7 @@ function renderLists() {
     d.querySelector('b').textContent = l.name;
     const mk = (txt, cls, fn) => { const b = document.createElement('button'); b.className = 'btn small ' + cls; b.textContent = txt; b.onclick = fn; d.appendChild(b); };
     if (l.id !== state.activeListId) mk('Välj', '', () => { state.activeListId = l.id; save(); renderLists(); });
-    mk('✎ Ändra ord', 'orange', () => openEditor(l.id));
+    mk('✎ Ändra ord', 'ghost', () => openEditor(l.id));
     mk('🗑', 'ghost', () => { if (confirm(`Ta bort listan "${l.name}" och alla dess ord?`)) deleteList(l.id); });
     box.appendChild(d);
   });
