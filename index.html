@@ -234,6 +234,7 @@
   <h2>Vad vill du öva?</h2>
   <div class="box">
     <b>Välj glosläxor:</b>
+    <label class="pick" id="qs-mis"><input type="checkbox" id="qs-mis-cb"><span>🧩 Bara mina misstag</span><small id="qs-mis-n"></small></label>
     <div id="qs-lists"></div>
     <div style="margin-top:6px">
       <button class="btn small ghost" id="qs-random">🎲 Slumpa en vecka</button>
@@ -528,7 +529,7 @@ $('l-export').onclick = () => {
   const data = {
     app: 'glosor', version: 1, exported: new Date().toISOString(),
     lists: state.lists.map(l => ({ id: l.id, name: l.name, words: l.words.map(w => ({ en: w.en, sv: w.sv })), best: l.best || {} })),
-    everyday: state.everyday || {}
+    everyday: state.everyday || {}, mistakes: state.mistakes || {}
   };
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
@@ -555,6 +556,11 @@ Glosläxor som redan finns ersätts, övriga läggs till.`)) return;
   Object.entries(d.everyday || {}).forEach(([id, p]) => {
     if (!p || typeof p.ok !== 'number' || typeof p.seen !== 'number') return;
     const q = ev[id] || { ok: 0, seen: 0 }; ev[id] = { ok: Math.max(q.ok, p.ok), seen: Math.max(q.seen, p.seen) };
+  });
+  const ms = state.mistakes = state.mistakes || {};
+  Object.entries(d.mistakes || {}).forEach(([k, e]) => {
+    if (e && typeof e.en === 'string' && typeof e.sv === 'string' && typeof e.n === 'number' && (!ms[k] || (e.t || 0) > (ms[k].t || 0)))
+      ms[k] = { en: clean(e.en, 100), sv: clean(e.sv, 100), n: e.n, ok: +e.ok || 0, t: +e.t || Date.now() };
   });
   if (!active()) state.activeListId = state.lists[0].id;
   save(); renderLists(); backupMsg(`Läste in ${lists.length} glosläxor ✓`, true);
@@ -643,7 +649,13 @@ function renderPick(key, boxId, countId) {
 }
 function renderPickers() {
   if ($('quizsetup').classList.contains('active')) {
-    const t = renderPick('quizSel', 'qs-lists', 'qs-count');
+    let t = renderPick('quizSel', 'qs-lists', 'qs-count');
+    const n = misList().length, on = !!state.quizMis && n > 0;
+    $('qs-mis-n').textContent = n ? n + ' ord' : 'inga misstag än';
+    $('qs-mis-cb').checked = on; $('qs-mis-cb').disabled = !n;
+    $('qs-mis').className = 'pick' + (on ? ' on' : '');
+    $('qs-lists').style.opacity = on ? .4 : 1;
+    if (on) { t = n; $('qs-count').textContent = `${Math.min(n, 20)} misstag att öva (de som blivit fel oftast först).`; }
     document.querySelectorAll('[data-dir]').forEach(b => b.disabled = !t);
   }
   if ($('evsetup').classList.contains('active') && $('evm-box').style.display !== 'none') {
@@ -669,11 +681,24 @@ function wirePickerButtons(key, p) {
 wirePickerButtons('quizSel', 'qs'); wirePickerButtons('memSel', 'ms'); wirePickerButtons('evSel', 'evm');
 let Q = null;
 document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => startQuiz(b.dataset.dir));
+/* ---------- mistakes: words she got wrong, practised until right twice in a row ---------- */
+const misKey = w => norm(w.en) + '|' + norm(w.sv);
+function misRecord(w, ok) { // ok = right on the first try
+  const m = state.mistakes = state.mistakes || {}, k = misKey(w), e = m[k];
+  if (ok) { if (e && e.n > 0 && e.ok < 2) { e.ok++; e.t = Date.now(); save(); } }
+  else { m[k] = { en: w.en, sv: w.sv, n: (e ? e.n : 0) + 1, ok: 0, t: Date.now() }; save(); }
+}
+function misList() { return Object.values(state.mistakes || {}).filter(e => e.n > 0 && e.ok < 2); }
+$('qs-mis-cb').onchange = e => { state.mistakes = state.mistakes || {}; state.quizMis = e.target.checked; saveLocal(); renderPickers(); };
+
 function startQuiz(dir) {
-  const ids = getSel('quizSel'), words = selWords(ids);
+  const mis = state.quizMis && misList().length > 0;
+  let ids = [], words;
+  if (mis) words = shuffle(misList().slice()).sort((a, b) => b.n - a.n).slice(0, 20).map(e => ({ id: 'm:' + misKey(e), en: e.en, sv: e.sv }));
+  else { ids = getSel('quizSel'); words = selWords(ids); }
   if (!words.length) return;
   const items = shuffle(words.map(w => ({ w, dir: dir === 'mix' ? (Math.random() < .5 ? 'sv2en' : 'en2sv') : dir })));
-  Q = { listIds: ids, dir, queue: items, total: items.length, done: 0, score: 0, firstTry: 0, cur: null, hints: 0, tries: 0, locked: false };
+  Q = { mis, listIds: ids, dir, queue: items, total: items.length, done: 0, score: 0, firstTry: 0, cur: null, hints: 0, tries: 0, locked: false };
   show('quiz'); nextQ();
 }
 function nextQ() {
@@ -703,7 +728,7 @@ function checkQ() {
   if (answers(targetText()).includes(val)) {
     Q.locked = true; sfx.ok();
     const pts = Q.tries === 0 ? (Q.hints === 0 ? 10 : Q.hints === 1 ? 7 : 5) : 3;
-    Q.score += pts; if (Q.tries === 0) Q.firstTry++;
+    Q.score += pts; if (Q.tries === 0) { Q.firstTry++; misRecord(Q.cur.w, true); }
     Q.done++; Q.queue.shift();
     fb.className = 'ok'; fb.textContent = '✓ Rätt! +' + pts;
     speak(Q.cur.w.en);
@@ -713,7 +738,7 @@ function checkQ() {
   } else {
     Q.tries++; sfx.no();
     $('q-card').classList.remove('shake'); void $('q-card').offsetWidth; $('q-card').classList.add('shake');
-    if (Q.tries === 1) { fb.className = 'no'; fb.textContent = '✗ Inte riktigt – försök igen!'; $('q-input').select(); }
+    if (Q.tries === 1) { misRecord(Q.cur.w, false); fb.className = 'no'; fb.textContent = '✗ Inte riktigt – försök igen!'; $('q-input').select(); }
     else { // second miss: show answer, requeue at end
       Q.locked = true; fb.className = 'no'; fb.innerHTML = '';
       fb.append('Rätt svar: '); const b = document.createElement('b'); b.textContent = targetText().split('/')[0].trim(); fb.appendChild(b);
@@ -741,7 +766,8 @@ function finishQuiz() {
   if (isBest) { l.best.quiz = Q.score; if (only) { l.updated = Date.now(); save(); } }
   $('r-title').textContent = stars === 3 ? 'Fantastiskt! 🎉' : stars === 2 ? 'Bra jobbat! 👍' : 'Fortsätt öva! 💪';
   $('r-stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
-  $('r-text').innerHTML = `${Q.score} poäng av ${max}<br>${Q.firstTry} av ${Q.total} rätt på första försöket`;
+  $('r-text').innerHTML = `${Q.score} poäng av ${max}<br>${Q.firstTry} av ${Q.total} rätt på första försöket`
+    + (Q.mis ? `<br>Misstag kvar att öva: ${misList().length}` : '');
   $('r-best').textContent = isBest && only ? '🏆 Nytt rekord!' : '';
   $('r-again').onclick = () => show('quizsetup'); $('r-again').textContent = 'Öva igen';
   show('result'); sfx.win(); if (stars >= 2) confetti();
@@ -984,7 +1010,7 @@ function scheduleSync(ms = 2500) {
 function snapshot() { // what is shared between devices
   return {
     lists: state.lists.map(l => ({ id: l.id, name: l.name, words: l.words, best: l.best || {}, updated: l.updated || 0, auto: !!l.auto })),
-    deleted: state.deletedLists || {}, everyday: state.everyday || {}
+    deleted: state.deletedLists || {}, everyday: state.everyday || {}, mistakes: state.mistakes || {}
   };
 }
 function mergeData(a, b) { // pure: newest change per list wins, deletions stick, word progress takes the highest
@@ -1002,14 +1028,16 @@ function mergeData(a, b) { // pure: newest change per list wins, deletions stick
     const q = everyday[id] || { ok: 0, seen: 0 };
     everyday[id] = { ok: Math.max(q.ok, p.ok), seen: Math.max(q.seen, p.seen) };
   }
-  return { lists, deleted, everyday };
+  const mistakes = { ...(a.mistakes || {}) };
+  for (const [k, e] of Object.entries(b.mistakes || {})) if (!mistakes[k] || (e.t || 0) > (mistakes[k].t || 0)) mistakes[k] = e;
+  return { lists, deleted, everyday, mistakes };
 }
 const syncCanon = d => JSON.stringify({
   lists: [...(d.lists || [])].sort((x, y) => x.id < y.id ? -1 : 1).map(l => [l.id, l.name, l.words.map(w => [w.en, w.sv]), l.best, l.updated || 0, !!l.auto]),
-  deleted: Object.entries(d.deleted || {}).sort(), everyday: Object.entries(d.everyday || {}).sort()
+  deleted: Object.entries(d.deleted || {}).sort(), everyday: Object.entries(d.everyday || {}).sort(), mistakes: Object.entries(d.mistakes || {}).sort()
 });
 function applyMerged(m) {
-  state.lists = m.lists; state.deletedLists = m.deleted; state.everyday = m.everyday;
+  state.lists = m.lists; state.deletedLists = m.deleted; state.everyday = m.everyday; state.mistakes = m.mistakes;
   if (!state.lists.length) newList();
   if (!active()) state.activeListId = state.lists[0].id;
   saveLocal();
