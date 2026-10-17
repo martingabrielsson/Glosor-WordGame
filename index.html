@@ -203,6 +203,14 @@
   <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button><button class="btn small" id="l-new">+ Ny lista</button></div>
   <h2>Mina glosläxor</h2>
   <div id="l-items"></div>
+  <div class="box">
+    <b>Säkerhetskopia</b>
+    <p class="muted" style="font-size:14px;margin:4px 0 8px">Spara alla glosläxor (och framsteg) som en fil på enheten, eller läs in en sparad fil.</p>
+    <button class="btn small ghost" id="l-export">💾 Exportera</button>
+    <button class="btn small ghost" id="l-import">📥 Importera</button>
+    <input type="file" id="l-file" accept=".json,application/json" style="display:none">
+    <div id="l-msg" style="font-weight:700;min-height:22px;margin-top:6px"></div>
+  </div>
 </div>
 
 <!-- EDITOR -->
@@ -379,7 +387,7 @@ function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active'); window.scrollTo(0, 0);
   if (id === 'home') renderHome();
-  if (id === 'lists') renderLists();
+  if (id === 'lists') { $('l-msg').textContent = ''; renderLists(); }
   if (id === 'quizsetup' || id === 'memsetup' || id === 'evsetup') renderPickers();
 }
 document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) { stopTimers(); show(g.dataset.go); } });
@@ -510,6 +518,50 @@ function deleteList(id) {
 $('l-new').onclick = () => {
   const name = prompt('Namn på den nya listan:', 'Vecka ' + isoWeek());
   if (name && name.trim()) { const l = newList(name.trim().slice(0, 40)); openEditor(l.id); }
+};
+
+/* ---------- backup: export / import ---------- */
+function backupMsg(t, ok) { const m = $('l-msg'); m.textContent = t; m.style.color = ok ? 'var(--green)' : 'var(--red)'; }
+$('l-export').onclick = () => {
+  const data = {
+    app: 'glosor', version: 1, exported: new Date().toISOString(),
+    lists: state.lists.map(l => ({ id: l.id, name: l.name, words: l.words.map(w => ({ en: w.en, sv: w.sv })), best: l.best || {} })),
+    everyday: state.everyday || {}
+  };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = 'glosor-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  backupMsg(`Sparade ${data.lists.length} glosläxor till en fil.`, true);
+};
+const clean = (s, n) => (typeof s === 'string' ? s : '').trim().slice(0, n);
+function importData(d) {
+  if (!d || d.app !== 'glosor' || !Array.isArray(d.lists)) throw new Error('format');
+  const lists = d.lists.map(l => ({
+    id: clean(l.id, 40) || uid(), name: clean(l.name, 40) || 'Importerad lista',
+    words: (Array.isArray(l.words) ? l.words : []).map(w => ({ id: uid(), en: clean(w && w.en, 100), sv: clean(w && w.sv, 100) })).filter(w => w.en && w.sv).slice(0, MAX_WORDS),
+    best: l.best && typeof l.best === 'object' ? l.best : {}
+  }));
+  if (!lists.length) throw new Error('empty');
+  const n = lists.reduce((s, l) => s + l.words.length, 0);
+  if (!confirm(`Läsa in ${lists.length} glosläxor (${n} ord)?
+Glosläxor som redan finns ersätts, övriga läggs till.`)) return;
+  const ids = new Set(lists.map(l => l.id));
+  state.lists = state.lists.filter(l => !ids.has(l.id) && !(l.auto && !l.words.length));
+  lists.forEach(l => { if (state.deletedLists) delete state.deletedLists[l.id]; state.lists.push({ ...l, updated: Date.now(), auto: false }); });
+  const ev = state.everyday = state.everyday || {};
+  Object.entries(d.everyday || {}).forEach(([id, p]) => {
+    if (!p || typeof p.ok !== 'number' || typeof p.seen !== 'number') return;
+    const q = ev[id] || { ok: 0, seen: 0 }; ev[id] = { ok: Math.max(q.ok, p.ok), seen: Math.max(q.seen, p.seen) };
+  });
+  if (!active()) state.activeListId = state.lists[0].id;
+  save(); renderLists(); backupMsg(`Läste in ${lists.length} glosläxor ✓`, true);
+}
+$('l-import').onclick = () => $('l-file').click();
+$('l-file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { importData(JSON.parse(await f.text())); }
+  catch (err) { backupMsg('Det gick inte att läsa filen. Välj en säkerhetskopia från Glosor.', false); }
 };
 
 /* ---------- editor ---------- */
