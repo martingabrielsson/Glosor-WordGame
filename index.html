@@ -58,12 +58,13 @@
   .badge { background: var(--yellow); color: #5a4300; border-radius: 10px; padding: 2px 8px; font-size: 13px; font-weight: 700; }
 
   /* Editor */
-  .cols { display: grid; grid-template-columns: 28px 1fr 1fr 40px; gap: 6px; font-weight: 700; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
-  .erow { display: grid; grid-template-columns: 28px 1fr 1fr 40px; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .cols { display: grid; grid-template-columns: 28px 1fr 40px 1fr 40px; gap: 6px; font-weight: 700; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+  .erow { display: grid; grid-template-columns: 28px 1fr 40px 1fr 40px; gap: 6px; margin-bottom: 6px; align-items: center; }
   .erow .n { color: var(--muted); font-size: 13px; text-align: center; }
   input[type=text] { width: 100%; padding: 10px 12px; font: inherit; font-size: 17px; border: 2px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); outline: none; }
   input[type=text]:focus { border-color: var(--purple); }
   input.bad { border-color: var(--red); background: #fff1f1; }
+  .rd { border: none; background: var(--yellow); border-radius: 10px; font-size: 18px; height: 40px; cursor: pointer; }
   .del { border: none; background: #fde8e8; color: var(--red); border-radius: 10px; font-size: 18px; height: 40px; cursor: pointer; }
   #ed-status { text-align: center; font-weight: 700; margin: 8px 0; min-height: 24px; }
   #ed-name { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 10px; }
@@ -153,7 +154,7 @@
   <div class="topbar"><button class="btn small ghost" id="ed-back">← Listor</button><button class="btn small ghost" id="ed-rename">✎ Byt namn</button></div>
   <div id="ed-name"></div>
   <div class="box">
-    <div class="cols"><span></span><span>ENGELSKA</span><span>SVENSKA</span><span></span></div>
+    <div class="cols"><span></span><span>ENGELSKA</span><span></span><span>SVENSKA</span><span></span></div>
     <div id="ed-rows"></div>
     <div id="ed-status"></div>
     <p class="muted" style="font-size:13px;text-align:center">Max 20 ord. Flera rätta svar? Skriv med / emellan, t.ex. <i>bil / auto</i>. Allt sparas automatiskt.</p>
@@ -285,8 +286,8 @@ function answers(str) { // accepted alternatives
   str.split(/[\/,;]/).forEach(p => { const n = norm(p); if (n && !all.includes(n)) all.push(n); });
   return all;
 }
-function speak(text) {
-  if (state.muted || !('speechSynthesis' in window)) return;
+function speak(text, force) {
+  if ((state.muted && !force) || !('speechSynthesis' in window)) return;
   try { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = BASE_RATE * (state.speed || 1); speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
 }
 
@@ -400,8 +401,9 @@ function openEditor(id) {
   for (let i = 0; i < MAX_WORDS; i++) {
     const w = l.words[i] || { en: '', sv: '' };
     const r = document.createElement('div'); r.className = 'erow';
-    r.innerHTML = `<span class="n">${i + 1}</span><input type="text" class="en" placeholder="apple" autocomplete="off" autocapitalize="off" spellcheck="false"><input type="text" class="sv" placeholder="äpple" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="del" title="Ta bort ordet">🗑</button>`;
+    r.innerHTML = `<span class="n">${i + 1}</span><input type="text" class="en" placeholder="apple" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="rd" title="Lyssna">🔊</button><input type="text" class="sv" placeholder="äpple" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="del" title="Ta bort ordet">🗑</button>`;
     r.querySelector('.en').value = w.en; r.querySelector('.sv').value = w.sv;
+    r.querySelector('.rd').onclick = () => { const t = r.querySelector('.en').value.trim(); if (t) speak(t, true); };
     r.querySelector('.del').onclick = () => { r.querySelector('.en').value = ''; r.querySelector('.sv').value = ''; editorSync(); };
     rows.appendChild(r);
   }
