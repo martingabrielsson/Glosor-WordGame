@@ -179,7 +179,7 @@
     <div id="sy-error" style="color:var(--red);font-weight:700;text-align:center;min-height:22px"></div>
   </div>
   <div class="box" id="sy-on" style="display:none">
-    <p style="text-align:center">Skriv in den här koden på de andra enheterna:</p>
+    <p style="text-align:center" id="sy-hint">Skriv in den här koden på de andra enheterna:</p>
     <div id="sy-code" style="text-align:center;font-size:30px;font-weight:800;letter-spacing:2px;color:var(--purple-d);margin:8px 0"></div>
     <div class="muted" id="sy-status" style="text-align:center;min-height:22px"></div>
     <button class="btn" id="sy-now">🔄 Synka nu</button>
@@ -341,7 +341,8 @@
 'use strict';
 const KEY = 'glosor.v1', MAX_WORDS = 20, MEM_MAX = 20, BASE_RATE = 0.85; // speed 100% = BASE_RATE
 // Cloud sync between devices: fill in from your Firebase project (see SYNC_SETUP.md). Empty = sync off.
-const SYNC_CFG = { apiKey: '', projectId: '' };
+// code = the one shared family code used by every device (no typing needed). Leave '' to let each device enter its own.
+const SYNC_CFG = { apiKey: '', projectId: '', code: 'Torpaskolan4A' };
 let syncTimer = null, syncBusy = false, syncStatus = '';
 const CHEERS = ['Fantastiskt!','Superbra!','Grymt!','Snyggt!','Bra jobbat!','Toppen!','Wow!','Perfekt!','Du är bäst!','Heja!'];
 
@@ -920,7 +921,8 @@ function finishEv() {
 }
 
 /* ---------- sync between devices (Firebase Firestore, family code) ---------- */
-function syncReady() { return !!(SYNC_CFG.apiKey && SYNC_CFG.projectId && state.sync && state.sync.code); }
+const syncCode = () => SYNC_CFG.code || (state.sync && state.sync.code) || '';
+function syncReady() { return !!(SYNC_CFG.apiKey && SYNC_CFG.projectId && syncCode()); }
 function scheduleSync(ms = 2500) {
   if (!syncReady()) return;
   clearTimeout(syncTimer); syncTimer = setTimeout(() => syncNow(), ms);
@@ -973,7 +975,7 @@ async function syncNow() {
   if (!syncReady() || syncBusy) return;
   if (['editor', 'quiz', 'evround', 'memory'].some(id => $(id).classList.contains('active'))) { scheduleSync(8000); return; }
   syncBusy = true; setSyncStatus('Synkar…');
-  const base = `https://firestore.googleapis.com/v1/projects/${SYNC_CFG.projectId}/databases/(default)/documents/families/${state.sync.code}`;
+  const base = `https://firestore.googleapis.com/v1/projects/${SYNC_CFG.projectId}/databases/(default)/documents/families/${encodeURIComponent(syncCode())}`;
   const key = '?key=' + encodeURIComponent(SYNC_CFG.apiKey);
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -996,7 +998,7 @@ async function syncNow() {
       if ((pr.status === 400 || pr.status === 409) && attempt < 2) continue; // someone else wrote meanwhile: merge again
       throw new Error('HTTP ' + pr.status);
     }
-    state.sync.last = Date.now(); saveLocal(); setSyncStatus('');
+    (state.sync = state.sync || {}).last = Date.now(); saveLocal(); setSyncStatus('');
   } catch (e) {
     setSyncStatus('Ingen kontakt just nu – försöker igen senare.'); scheduleSync(30000);
   }
@@ -1008,12 +1010,13 @@ function genCode() {
 }
 function normCode(s) { const c = s.toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length === 12 ? c.match(/.{4}/g).join('-') : null; }
 function renderSync() {
-  const cfg = !!(SYNC_CFG.apiKey && SYNC_CFG.projectId), has = !!(state.sync && state.sync.code);
+  const cfg = !!(SYNC_CFG.apiKey && SYNC_CFG.projectId), has = !!syncCode(), fixed = !!SYNC_CFG.code;
   $('sy-off').style.display = cfg ? 'none' : 'block';
   $('sy-join').style.display = cfg && !has ? 'block' : 'none';
   $('sy-on').style.display = cfg && has ? 'block' : 'none';
-  $('sy-code').textContent = has ? state.sync.code : '';
-  const last = has && state.sync.last ? 'Senast synkad: ' + new Date(state.sync.last).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
+  $('sy-code').textContent = fixed ? '✓ Ansluten' : has ? state.sync.code : '';
+  $('sy-hint').style.display = fixed ? 'none' : ''; $('sy-leave').style.display = fixed ? 'none' : '';
+  const last = has && state.sync && state.sync.last ? 'Senast synkad: ' + new Date(state.sync.last).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
   $('sy-status').textContent = syncStatus || last;
 }
 function syncConnect(code) {

@@ -12,14 +12,13 @@ Nothing personal is stored, only word lists and progress.
 
 ## 2. Paste these security rules
 In Firestore, open the **Rules** tab, replace everything with the text below and press **Publish**.
-Only someone who knows the full family code can read or write that family's data, and
-the list of families can't be read.
+Only the one shared document (the family code) can be read or written.
 
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /families/{code} {
+    match /families/Torpaskolan4A {
       allow get: if true;
       allow create, update: if request.resource.data.keys().hasOnly(['data'])
                             && request.resource.data.data is string
@@ -39,19 +38,20 @@ service cloud.firestore {
 In `index.html`, find this line near the top of the script and fill in the values:
 
 ```js
-const SYNC_CFG = { apiKey: 'AIza...', projectId: 'glosor-12345' };
+const SYNC_CFG = { apiKey: 'AIza...', projectId: 'glosor-12345', code: 'Torpaskolan4A' };
 ```
 
 Commit and push to GitHub (the app is served by GitHub Pages).
 
-## 5. Use it on each device
-1. Open the app, tap **☁️ Synka enheter**.
-2. On the first device tap **Skapa ny kod** and note the code (e.g. `KZER-C377-ZMFR`).
-3. On the other devices tap **Synka enheter**, type the same code and tap **Anslut**.
+## 5. Use it
+Nothing to do on the devices: every device that opens the app link uses the shared code
+`Torpaskolan4A` automatically and syncs on its own. **☁️ Synka enheter** shows the status and a
+"Synka nu" button.
 
 Notes
-- On an iPhone/iPad, Safari and the home-screen icon keep separate data, so enter the code in
-  whichever one she actually uses.
+- The code is in the (public) repo, so anyone who finds it could read or overwrite the word lists.
+  To change it, edit `code` in `SYNC_CFG` **and** the document name in the rules.
+- On an iPhone/iPad, Safari and the home-screen icon keep separate data, but both sync to the same shared data.
 - Changes sync a couple of seconds after each save, when the app is opened again, and once a minute.
 - If two devices change the **same week** at the same time, the most recent change wins.
 - Voice speed and sound on/off are per device and not synced.
