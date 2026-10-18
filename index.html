@@ -2,7 +2,7 @@
 <html lang="sv">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Glosor</title>
 <meta name="theme-color" content="#d8c6f0">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,6 +23,7 @@
     --green: #2bb673; --red: #e5484d; --line: #d8c6f0; --yellow: #ffd54a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { touch-action: pan-x pan-y; } /* scrolling yes, pinch/double-tap zoom no */
   body { background: var(--bg); color: var(--ink); font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; min-height: 100vh; padding: 14px; }
   .screen { display: none; max-width: 760px; margin: 0 auto; }
   .screen.active { display: block; }
@@ -378,6 +379,9 @@
 
 <script>
 'use strict';
+/* no pinch zoom (iOS Safari ignores user-scalable=no, so block the gestures too) */
+['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
 const KEY = 'glosor.v1', MAX_WORDS = 20, MEM_MAX = 20, BASE_RATE = 0.85; // speed 100% = BASE_RATE
 // Cloud sync between devices: fill in from your Firebase project (see SYNC_SETUP.md). Empty = sync off.
 // code = the one shared family code used by every device (no typing needed). Leave '' to let each device enter its own.
