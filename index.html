@@ -288,7 +288,7 @@
   <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button></div>
   <h2>Bra ord att kunna!</h2>
   <p class="muted" style="text-align:center;margin-bottom:8px">Läs och lyssna på ordet – säg det sedan högt!</p>
-  <details class="box" id="ev-help" open>
+  <details class="box" id="ev-help">
     <summary>❓ Så här gör du</summary>
     <div id="ev-help-body"></div>
   </details>
@@ -994,8 +994,7 @@ const EV_HELP = `<ol class="helplist">
 <div class="helptip">🔊 Tryck på högtalaren för att höra ordet igen.<br>👀 <b>Visa svenska</b> visar vad ordet betyder.<br>💛 Det gör inget om det blir fel – ordet kommer tillbaka i slutet.<br>🎙️ Fungerar inte mikrofonen? Då spelar du in dig själv, lyssnar och trycker på <b>Jag sa det rätt!</b></div>`;
 $('ev-help-body').innerHTML = EV_HELP; $('ev-helpbox').innerHTML = EV_HELP;
 $('ev-helpbtn').onclick = () => { const b = $('ev-helpbox'); b.style.display = b.style.display === 'none' ? 'block' : 'none'; };
-$('ev-help').addEventListener('toggle', () => { state.evHelpOpen = $('ev-help').open; saveLocal(); });
-$('h-ev').onclick = () => { renderEvSetup(); $('ev-help').open = state.evHelpOpen !== false; $('evs-details').open = state.evTopicsOpen !== false; show('evsetup'); };
+$('h-ev').onclick = () => { renderEvSetup(); $('ev-help').open = false; // help starts collapsed every time $('evs-details').open = state.evTopicsOpen !== false; show('evsetup'); };
 $('evs-details').addEventListener('toggle', () => { state.evTopicsOpen = $('evs-details').open; saveLocal(); });
 $('evm-open').onclick = () => {
   const b = $('evm-box'); b.style.display = b.style.display === 'none' ? 'block' : 'none';
