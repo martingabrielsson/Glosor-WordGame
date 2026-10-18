@@ -122,6 +122,9 @@
   .mic:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--purple-d); }
   .mic.on { background: var(--red); box-shadow: 0 6px 0 #b3282d; animation: pulse 1s infinite; }
   @keyframes pulse { 50% { transform: scale(1.08); } }
+  #q-heard { text-align: center; min-height: 26px; color: var(--muted); font-size: 18px; margin-top: 6px; }
+  #q-vnote { text-align: center; font-size: 14px; color: var(--muted); min-height: 18px; }
+  #q-self { display: none; text-align: center; }
   #ev-heard { text-align: center; min-height: 26px; color: var(--muted); font-size: 18px; margin-top: 6px; }
   #ev-note { text-align: center; font-size: 14px; color: var(--muted); min-height: 18px; }
   #ev-self { display: none; text-align: center; }
@@ -250,7 +253,9 @@
   </div>
   <button class="btn" data-dir="sv2en">🇸🇪 → 🇬🇧 Se svenska, skriv engelska</button>
   <button class="btn orange" data-dir="en2sv">🇬🇧 → 🇸🇪 Se engelska, skriv svenska</button>
-  <button class="btn green" data-dir="mix">🔀 Blandat</button>
+  <button class="btn pink" data-dir="v_sv2en">🔊 🇸🇪 → 🇬🇧 Hör svenska, säg engelska</button>
+  <button class="btn pink" data-dir="v_en2sv">🔊 🇬🇧 → 🇸🇪 Hör engelska, säg svenska</button>
+  <button class="btn green" data-dir="mix">🔀 Blandat (alla fyra)</button>
 </div>
 
 <!-- QUIZ -->
@@ -259,9 +264,15 @@
   <div class="progress"><div id="q-bar"></div></div>
   <div class="qinfo"><span id="q-count"></span><span id="q-score"></span></div>
   <div class="prompt-card" id="q-card"></div>
-  <div class="answer-row">
+  <div class="answer-row" id="q-answer">
     <input type="text" id="q-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Skriv här…">
     <button class="btn" id="q-check">✓</button>
+  </div>
+  <div id="q-voice" style="display:none">
+    <div class="micwrap"><button class="mic" id="q-mic" title="Säg ordet">🎤</button></div>
+    <div id="q-self"><button class="btn green small" id="q-yes">👍 Jag sa det rätt!</button><button class="btn ghost small" id="q-again">🔁 Igen</button></div>
+    <div id="q-heard"></div>
+    <div id="q-vnote"></div>
   </div>
   <div id="q-hint"></div>
   <div id="q-feedback"></div>
@@ -407,9 +418,14 @@ function answers(str) { // accepted alternatives
   str.split(/[\/,;]/).forEach(p => { const n = norm(p); if (n && !all.includes(n)) all.push(n); });
   return all;
 }
-function speak(text, force) {
+function speak(text, force, lang = 'en-US') {
   if ((state.muted && !force) || !('speechSynthesis' in window)) return;
-  try { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = BASE_RATE * (state.speed || 1); speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+  try {
+    const u = new SpeechSynthesisUtterance(text); u.lang = lang; u.rate = BASE_RATE * (state.speed || 1);
+    const v = speechSynthesis.getVoices().find(x => x.lang && x.lang.replace('_', '-').toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
+    if (v && lang !== 'en-US') u.voice = v; // pick an installed Swedish voice; English keeps the default
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (e) {}
 }
 
 /* ---------- sound ---------- */
@@ -705,67 +721,164 @@ function startQuiz(dir) {
   if (mis) words = shuffle(misList().slice()).sort((a, b) => b.n - a.n).slice(0, 20).map(e => ({ id: 'm:' + misKey(e), en: e.en, sv: e.sv }));
   else { ids = getSel('quizSel'); words = selWords(ids); }
   if (!words.length) return;
-  const items = shuffle(words.map(w => ({ w, dir: dir === 'mix' ? (Math.random() < .5 ? 'sv2en' : 'en2sv') : dir })));
-  Q = { mis, listIds: ids, dir, queue: items, total: items.length, done: 0, score: 0, firstTry: 0, cur: null, hints: 0, tries: 0, locked: false };
+  const MODES = ['sv2en', 'en2sv', 'v_sv2en', 'v_en2sv'];
+  const items = shuffle(words.map(w => ({ w, dir: dir === 'mix' ? MODES[Math.floor(Math.random() * 4)] : dir })));
+  Q = { vmode: getSR() ? 'rec' : (window.MediaRecorder && navigator.mediaDevices ? 'record' : 'self'), mis, listIds: ids, dir, queue: items, total: items.length, done: 0, score: 0, firstTry: 0, cur: null, hints: 0, tries: 0, locked: false };
   show('quiz'); nextQ();
+}
+const qIsVoice = d => d.startsWith('v_');
+const qFromSv = d => /sv2en$/.test(d);              // prompt is Swedish, answer English
+const qPromptLang = d => qFromSv(d) ? 'sv-SE' : 'en-US';
+const qAnswerLang = d => qFromSv(d) ? 'en-US' : 'sv-SE';
+function qSpeakPrompt(force) { // read the word naturally: drop (clarifiers), pause between alternatives
+  const { w, dir } = Q.cur;
+  speak((qFromSv(dir) ? w.sv : w.en).replace(/\(.*?\)/g, '').replace(/\s*\/\s*/g, ', ').trim(), force, qPromptLang(dir));
 }
 function nextQ() {
   if (!Q.queue.length) return finishQuiz();
   Q.cur = Q.queue[0]; Q.hints = 0; Q.tries = 0; Q.locked = false;
-  const { w, dir } = Q.cur, card = $('q-card');
-  card.className = 'prompt-card ' + (dir === 'sv2en' ? 'sv' : 'en');
-  card.innerHTML = `<small>${dir === 'sv2en' ? 'Vad heter det på engelska?' : 'Vad heter det på svenska?'}</small>`;
-  card.appendChild(document.createTextNode(dir === 'sv2en' ? w.sv : w.en));
-  $('q-input').value = ''; $('q-input').disabled = false; $('q-hint').textContent = ''; $('q-feedback').textContent = ''; $('q-feedback').className = '';
-  $('q-hintbtn').disabled = false; $('q-check').disabled = false;
-  $('q-speak').style.visibility = dir === 'en2sv' ? 'visible' : 'hidden';
-  $('q-input').focus();
+  const { w, dir } = Q.cur, card = $('q-card'), voice = qIsVoice(dir);
+  card.className = 'prompt-card ' + (qFromSv(dir) ? 'sv' : 'en');
+  card.innerHTML = `<small>${voice ? (qFromSv(dir) ? 'Lyssna och säg det på engelska' : 'Lyssna och säg det på svenska') : (qFromSv(dir) ? 'Vad heter det på engelska?' : 'Vad heter det på svenska?')}</small>`;
+  card.appendChild(document.createTextNode(qFromSv(dir) ? w.sv : w.en));
+  $('q-hint').textContent = ''; $('q-feedback').textContent = ''; $('q-feedback').className = '';
+  $('q-answer').style.display = voice ? 'none' : ''; $('q-hintbtn').style.display = voice ? 'none' : '';
+  $('q-voice').style.display = voice ? 'block' : 'none';
+  $('q-speak').style.visibility = voice || dir === 'en2sv' ? 'visible' : 'hidden';
+  if (voice) {
+    $('q-heard').textContent = ''; $('q-mic').disabled = false; $('q-mic').classList.remove('on');
+    qVoiceControls(); qVoiceNote();
+  } else {
+    $('q-input').value = ''; $('q-input').disabled = false; $('q-hintbtn').disabled = false; $('q-check').disabled = false;
+    $('q-input').focus();
+  }
   updateQHud();
-  if (dir === 'en2sv') speak(w.en);
+  if (voice) setTimeout(() => { if (Q && Q.cur === Q.queue[0] && Q.cur.w === w) qSpeakPrompt(); }, 300);
+  else if (dir === 'en2sv') speak(w.en);
 }
 function updateQHud() {
   $('q-bar').style.width = (Q.done / Q.total * 100) + '%';
   $('q-count').textContent = `Ord ${Math.min(Q.done + 1, Q.total)} av ${Q.total}`;
   $('q-score').textContent = '⭐ ' + Q.score;
 }
-function targetText() { return Q.cur.dir === 'sv2en' ? Q.cur.w.en : Q.cur.w.sv; }
-function checkQ() {
+function targetText() { return qFromSv(Q.cur.dir) ? Q.cur.w.en : Q.cur.w.sv; }
+function qOutcome(ok) { // shared by typed and spoken answers
   if (Q.locked) return;
-  const val = norm($('q-input').value); if (!val) return;
-  const fb = $('q-feedback');
-  if (answers(targetText()).includes(val)) {
+  const fb = $('q-feedback'), voice = qIsVoice(Q.cur.dir);
+  const lockControls = () => { $('q-input').disabled = true; $('q-check').disabled = true; $('q-hintbtn').disabled = true; $('q-mic').disabled = true; $('q-self').style.display = 'none'; qStopRec(); };
+  if (ok) {
     Q.locked = true; sfx.ok();
     const pts = Q.tries === 0 ? (Q.hints === 0 ? 10 : Q.hints === 1 ? 7 : 5) : 3;
     Q.score += pts; if (Q.tries === 0) { Q.firstTry++; misRecord(Q.cur.w, true); }
     Q.done++; Q.queue.shift();
     fb.className = 'ok'; fb.textContent = '✓ Rätt! +' + pts;
     speak(Q.cur.w.en);
-    $('q-input').disabled = true; $('q-check').disabled = true; $('q-hintbtn').disabled = true;
-    updateQHud();
+    lockControls(); updateQHud();
     setTimeout(nextQ, 1100);
   } else {
     Q.tries++; sfx.no();
     $('q-card').classList.remove('shake'); void $('q-card').offsetWidth; $('q-card').classList.add('shake');
-    if (Q.tries === 1) { misRecord(Q.cur.w, false); fb.className = 'no'; fb.textContent = '✗ Inte riktigt – försök igen!'; $('q-input').select(); }
+    if (Q.tries === 1) { misRecord(Q.cur.w, false); fb.className = 'no'; fb.textContent = '✗ Inte riktigt – försök igen!'; if (!voice) $('q-input').select(); }
     else { // second miss: show answer, requeue at end
       Q.locked = true; fb.className = 'no'; fb.innerHTML = '';
       fb.append('Rätt svar: '); const b = document.createElement('b'); b.textContent = targetText().split('/')[0].trim(); fb.appendChild(b);
-      $('q-input').disabled = true; $('q-check').disabled = true; $('q-hintbtn').disabled = true;
-      Q.queue.push(Q.queue.shift()); speak(Q.cur.w.en);
+      lockControls();
+      Q.queue.push(Q.queue.shift());
+      if (voice) speak(targetText().split('/')[0].trim(), false, qAnswerLang(Q.cur.dir)); else speak(Q.cur.w.en);
       setTimeout(nextQ, 2400);
     }
   }
 }
+function checkQ() {
+  if (Q.locked) return;
+  const val = norm($('q-input').value); if (!val) return;
+  qOutcome(answers(targetText()).includes(val));
+}
+/* ---- spoken answers: listen (sv-SE / en-US), else record-and-compare, else self-judge ---- */
+let qRec = null, qMedia = null;
+function vClean(s, lang) {
+  s = s.toLowerCase().replace(/\(.*?\)/g, '');
+  s = lang === 'sv-SE' ? s.replace(/[^a-zåäöé ]/g, '') : s.replace(/[^a-z' ]/g, '').replace(/'/g, '');
+  s = s.replace(/\s+/g, ' ').trim();
+  return lang === 'sv-SE' ? s.replace(/^att /, '') : s;
+}
+function vMatch(target, alts, lang) { // lenient: any alternative, inside a longer phrase, or 1 letter off (4+ letters)
+  const targets = [target, ...target.split(/[\/,;]/)].map(t => vClean(t, lang)).filter(Boolean);
+  return alts.some(a => {
+    const s = vClean(a, lang); if (!s) return false;
+    return targets.some(t => s === t || (' ' + s + ' ').includes(' ' + t + ' ') || (t.length >= 4 && evDist(s, t) <= 1));
+  });
+}
+function qVoiceNote() {
+  $('q-vnote').textContent = Q.vmode === 'rec' ? 'Tryck på mikrofonen och säg ordet.' :
+    Q.vmode === 'record' ? 'Här kan jag inte rätta dig. Spela in dig själv, lyssna och bedöm själv.' : 'Säg ordet högt och tryck sedan på en knapp.';
+}
+function qVoiceControls() {
+  $('q-mic').style.display = Q.vmode === 'self' ? 'none' : '';
+  $('q-self').style.display = Q.vmode === 'self' ? 'block' : 'none';
+}
+function qStopRec() { try { if (qRec) qRec.abort(); } catch (e) {} qRec = null; $('q-mic').classList.remove('on'); }
+function qFallback(msg) {
+  Q.vmode = window.MediaRecorder && navigator.mediaDevices ? 'record' : 'self';
+  qVoiceControls(); qVoiceNote(); $('q-heard').textContent = msg;
+}
+function qListen() {
+  if ('speechSynthesis' in window) speechSynthesis.cancel(); // don't let the app's own voice be heard
+  const lang = qAnswerLang(Q.cur.dir), word = Q.cur;
+  const r = new (getSR())(); qRec = r; r.lang = lang; r.interimResults = false; r.maxAlternatives = 5;
+  let heardAudio = false, finished = false;
+  r.onaudiostart = () => { heardAudio = true; };
+  r.onresult = e => {
+    finished = true;
+    const alts = [...e.results[0]].map(a => a.transcript);
+    $('q-heard').textContent = 'Jag hörde: ' + alts[0];
+    if (Q && Q.cur === word) qOutcome(vMatch(targetText(), alts, lang));
+  };
+  r.onerror = e => {
+    finished = true;
+    if (['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported'].includes(e.error)) qFallback('Mikrofonen eller språket fungerar inte här – du bedömer själv.');
+    else if (e.error === 'network') $('q-heard').textContent = 'Ingen kontakt med röstigenkänningen (behöver internet).';
+    else if (e.error !== 'aborted') $('q-heard').textContent = 'Jag hörde inget – försök igen!';
+  };
+  r.onend = () => {
+    $('q-mic').classList.remove('on');
+    if (!finished && !heardAudio) qFallback('Det går inte att lyssna här – du bedömer själv.');
+  };
+  $('q-heard').textContent = 'Jag lyssnar…'; $('q-mic').classList.add('on');
+  try { r.start(); } catch (e) { $('q-mic').classList.remove('on'); qFallback('Det går inte att lyssna här – du bedömer själv.'); }
+}
+async function qRecord() { // fallback: record yourself, then hear yourself and the model voice
+  if (qMedia && qMedia.state === 'recording') { qMedia.stop(); return; }
+  const lang = qAnswerLang(Q.cur.dir), word = Q.cur;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const chunks = [], mr = new MediaRecorder(stream); qMedia = mr;
+    mr.ondataavailable = e => chunks.push(e.data);
+    mr.onstop = () => {
+      stream.getTracks().forEach(t => t.stop()); $('q-mic').classList.remove('on');
+      $('q-heard').textContent = 'Lyssna på dig själv – och sedan på ordet…';
+      const model = () => speak(targetText().split('/')[0].trim(), true, lang);
+      const a = new Audio(URL.createObjectURL(new Blob(chunks, { type: mr.mimeType })));
+      a.onended = model; a.play().catch(model);
+      if (Q && Q.cur === word) $('q-self').style.display = 'block';
+    };
+    mr.start(); $('q-mic').classList.add('on'); $('q-heard').textContent = 'Spelar in… tryck igen när du är klar.';
+    setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 5000);
+  } catch (e) { Q.vmode = 'self'; qVoiceControls(); qVoiceNote(); $('q-heard').textContent = 'Mikrofonen fungerar inte här – du bedömer själv.'; }
+}
+$('q-mic').onclick = () => { if (Q && !Q.locked) Q.vmode === 'rec' ? qListen() : qRecord(); };
+$('q-yes').onclick = () => { if (Q) qOutcome(true); };
+$('q-again').onclick = () => { if (Q) qOutcome(false); };
 $('q-check').onclick = checkQ;
 $('q-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkQ(); });
-$('q-speak').onclick = () => { if (Q) speak(Q.cur.w.en); $('q-input').focus(); };
+$('q-speak').onclick = () => { if (!Q || !Q.cur) return; qSpeakPrompt(qIsVoice(Q.cur.dir)); if (!qIsVoice(Q.cur.dir)) $('q-input').focus(); };
 $('q-hintbtn').onclick = () => {
   if (Q.locked) return;
   const t = targetText().split('/')[0].trim(); Q.hints++;
   $('q-hint').textContent = Q.hints === 1 ? t.replace(/[^ ]/g, '_').split('').join(' ').replace(/^_/, t[0]) : t.slice(0, Math.min(2, t.length)) + t.slice(2).replace(/[^ ]/g, '_');
   $('q-input').focus();
 };
-$('q-quit').onclick = () => { if (confirm('Vill du avsluta övningen?')) show('home'); };
+$('q-quit').onclick = () => { if (confirm('Vill du avsluta övningen?')) { qStopRec(); show('home'); } };
 function finishQuiz() {
   const only = Q.listIds.length === 1 ? state.lists.find(x => x.id === Q.listIds[0]) : null;
   const l = only || { best: {} }, max = Q.total * 10, pct = Q.score / max;
