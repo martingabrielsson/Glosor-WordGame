@@ -117,6 +117,9 @@
   .ev-word { font-size: 46px; font-weight: 800; word-break: break-word; }
   .ev-sv { min-height: 30px; font-size: 22px; font-weight: 700; color: var(--orange-d); margin-top: 6px; }
   .ev-ex { min-height: 22px; color: var(--muted); font-style: italic; margin-top: 4px; }
+  .ev-label { font-size: 15px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+  .helplist { padding-left: 24px; line-height: 1.7; font-size: 17px; }
+  .helptip { font-size: 15px; color: var(--muted); line-height: 1.6; margin-top: 8px; }
   .micwrap { text-align: center; margin: 10px 0; }
   .mic { width: 110px; height: 110px; border-radius: 50%; border: none; font-size: 48px; color: #fff; background: var(--purple); box-shadow: 0 6px 0 var(--purple-d); cursor: pointer; }
   .mic:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--purple-d); }
@@ -284,6 +287,10 @@
   <div class="topbar"><button class="btn small ghost" data-go="home">← Hem</button></div>
   <h2>Bra ord att kunna!</h2>
   <p class="muted" style="text-align:center;margin-bottom:8px">Läs och lyssna på ordet – säg det sedan högt!</p>
+  <details class="box" id="ev-help" open>
+    <summary>❓ Så här gör du</summary>
+    <div id="ev-help-body"></div>
+  </details>
   <button class="btn pink" id="evs-random">🎲 10 slumpade ord</button>
   <button class="btn green" id="evm-open">📚 Mina glosläxor</button>
   <div class="box" id="evm-box" style="display:none">
@@ -305,10 +312,12 @@
 
 <!-- EVERYDAY ROUND -->
 <div id="evround" class="screen">
-  <div class="topbar"><button class="btn small ghost" id="ev-quit">✕ Avsluta</button><span><button class="btn small ghost speedbtn" title="Talhastighet"></button> <button class="speak" id="ev-speak" title="Lyssna">🔊</button></span></div>
+  <div class="topbar"><button class="btn small ghost" id="ev-quit">✕ Avsluta</button><button class="btn small ghost" id="ev-helpbtn">❓ Hjälp</button><span><button class="btn small ghost speedbtn" title="Talhastighet"></button> <button class="speak" id="ev-speak" title="Lyssna">🔊</button></span></div>
+  <div class="box" id="ev-helpbox" style="display:none"></div>
   <div class="progress"><div id="ev-bar"></div></div>
   <div class="qinfo"><span id="ev-count"></span><span id="ev-score"></span></div>
   <div class="ev-card">
+    <div class="ev-label">🗣️ Säg efter mig på engelska:</div>
     <div class="ev-word" id="ev-word"></div>
     <div class="ev-sv" id="ev-sv"></div>
     <div class="ev-ex" id="ev-ex"></div>
@@ -972,7 +981,17 @@ function renderEvSetup() {
     d.append(n, c); d.onclick = () => startEv(s); box.appendChild(d);
   });
 }
-$('h-ev').onclick = () => { renderEvSetup(); $('evs-details').open = state.evTopicsOpen !== false; show('evsetup'); };
+const EV_HELP = `<ol class="helplist">
+  <li>👀 Du <b>ser</b> ett engelskt ord och <b>hör</b> det uttalas.</li>
+  <li>🎤 Tryck på den stora <b>mikrofonen</b>.</li>
+  <li>🗣️ <b>Säg ordet högt på engelska</b> – precis som du hörde det. Som att säga efter mig: <i>“Repeat after me: apple”</i>.</li>
+  <li>✅ Appen berättar om det blev rätt. Blev det fel får du försöka en gång till.</li>
+</ol>
+<div class="helptip">🔊 Tryck på högtalaren för att höra ordet igen.<br>👀 <b>Visa svenska</b> visar vad ordet betyder.<br>💛 Det gör inget om det blir fel – ordet kommer tillbaka i slutet.<br>🎙️ Fungerar inte mikrofonen? Då spelar du in dig själv, lyssnar och trycker på <b>Jag sa det rätt!</b></div>`;
+$('ev-help-body').innerHTML = EV_HELP; $('ev-helpbox').innerHTML = EV_HELP;
+$('ev-helpbtn').onclick = () => { const b = $('ev-helpbox'); b.style.display = b.style.display === 'none' ? 'block' : 'none'; };
+$('ev-help').addEventListener('toggle', () => { state.evHelpOpen = $('ev-help').open; saveLocal(); });
+$('h-ev').onclick = () => { renderEvSetup(); $('ev-help').open = state.evHelpOpen !== false; $('evs-details').open = state.evTopicsOpen !== false; show('evsetup'); };
 $('evs-details').addEventListener('toggle', () => { state.evTopicsOpen = $('evs-details').open; saveLocal(); });
 $('evm-open').onclick = () => {
   const b = $('evm-box'); b.style.display = b.style.display === 'none' ? 'block' : 'none';
@@ -1004,6 +1023,7 @@ function evMyWords() { // words from the chosen weekly glosläxor (max 20); prog
   return shuffle(selWords(getSel('evSel')).map(w => ({ id: 'my:' + norm(w.en), sec: 0, en: w.en, sv: w.sv, ex: '' }))).slice(0, 20);
 }
 function startEv(sec, mine) {
+  $('ev-helpbox').style.display = 'none';
   lastEv = { sec, mine };
   const words = mine ? evMyWords() : evPick(sec);
   if (!words.length) return;
@@ -1012,7 +1032,7 @@ function startEv(sec, mine) {
   show('evround'); nextEv();
 }
 function evSetNote() {
-  $('ev-note').textContent = evMode === 'rec' ? 'Tryck på mikrofonen och säg ordet.' :
+  $('ev-note').textContent = evMode === 'rec' ? 'Tryck på 🎤 och säg ordet högt på engelska.' :
     evMode === 'record' ? 'Här kan jag inte rätta dig. Spela in dig själv, lyssna och bedöm själv.' : 'Säg ordet högt och tryck sedan på en knapp.';
 }
 function evShowControls() {
