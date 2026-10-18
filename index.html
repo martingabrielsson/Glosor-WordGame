@@ -994,7 +994,7 @@ const EV_HELP = `<ol class="helplist">
 <div class="helptip">🔊 Tryck på högtalaren för att höra ordet igen.<br>👀 <b>Visa svenska</b> visar vad ordet betyder.<br>💛 Det gör inget om det blir fel – ordet kommer tillbaka i slutet.<br>🎙️ Fungerar inte mikrofonen? Då spelar du in dig själv, lyssnar och trycker på <b>Jag sa det rätt!</b></div>`;
 $('ev-help-body').innerHTML = EV_HELP; $('ev-helpbox').innerHTML = EV_HELP;
 $('ev-helpbtn').onclick = () => { const b = $('ev-helpbox'); b.style.display = b.style.display === 'none' ? 'block' : 'none'; };
-$('h-ev').onclick = () => { renderEvSetup(); $('ev-help').open = false; // help starts collapsed every time $('evs-details').open = state.evTopicsOpen !== false; show('evsetup'); };
+$('h-ev').onclick = () => { renderEvSetup(); $('ev-help').open = false; /* help starts collapsed every time */ $('evs-details').open = state.evTopicsOpen !== false; show('evsetup'); };
 $('evs-details').addEventListener('toggle', () => { state.evTopicsOpen = $('evs-details').open; saveLocal(); });
 $('evm-open').onclick = () => {
   const b = $('evm-box'); b.style.display = b.style.display === 'none' ? 'block' : 'none';
