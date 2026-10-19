@@ -167,21 +167,21 @@
   #splash.go .letter { animation: gspin 1300ms cubic-bezier(.6, 0, .3, 1) forwards; }
   @keyframes gspin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
   @media (prefers-reduced-motion: reduce) { #splash.go .letter { animation: none; } }
-  /* smaller controls on phones so the start page and Öva glosor fit an iPhone screen */
+  /* slightly smaller controls on phones so the start page and Öva glosor fit an iPhone screen better */
   @media (max-width: 600px) {
-    #home #logo { width: min(150px, 42vw); margin: 0 auto 2px; }
-    #home .tagline { font-size: 15px; margin-bottom: 6px; }
-    #home .box { padding: 10px 12px; margin-bottom: 6px; border-radius: 16px; }
-    #home .activelist { font-size: 16px; }
-    #home .bests { font-size: 13px; }
-    #home > .btn, #quizsetup > .btn { padding: 11px 12px; font-size: 17px; margin: 7px 0; border-radius: 15px; }
-    #home .btn.small, #quizsetup .btn.small { font-size: 14px; padding: 6px 10px; margin: 2px; }
-    #quizsetup h2 { font-size: 21px; margin-bottom: 8px; }
-    #quizsetup > .topbar { margin-bottom: 6px; }
-    #quizsetup .box { padding: 10px 12px; margin-bottom: 8px; border-radius: 16px; }
-    #quizsetup .pick { padding: 6px 10px; margin: 4px 0; font-size: 16px; border-radius: 12px; }
-    #quizsetup .pick input { width: 20px; height: 20px; }
-    #quizsetup > .btn[data-dir] { font-size: 16px; }
+    #home #logo { width: min(185px, 48vw); margin: 2px auto 2px; }
+    #home .tagline { font-size: 16px; margin-bottom: 7px; }
+    #home .box { padding: 12px 14px; margin-bottom: 8px; border-radius: 18px; }
+    #home .activelist { font-size: 17px; }
+    #home .bests { font-size: 14px; }
+    #home > .btn, #quizsetup > .btn { padding: 13px 14px; font-size: 18px; margin: 8px 0; border-radius: 17px; }
+    #home .btn.small, #quizsetup .btn.small { font-size: 15px; padding: 7px 12px; margin: 3px; }
+    #quizsetup h2 { font-size: 23px; margin-bottom: 10px; }
+    #quizsetup > .topbar { margin-bottom: 8px; }
+    #quizsetup .box { padding: 12px 14px; margin-bottom: 10px; border-radius: 18px; }
+    #quizsetup .pick { padding: 8px 10px; margin: 5px 0; font-size: 17px; border-radius: 13px; }
+    #quizsetup .pick input { width: 21px; height: 21px; }
+    #quizsetup > .btn[data-dir] { font-size: 17px; }
   }
 </style>
 </head>
