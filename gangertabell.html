@@ -16,6 +16,7 @@
   --n5: #a9b0dc; --n6: #3f86d6; --n7: #dfe39a; --n8: #f7cf4a;
   --n9: #f6c9a8; --n10: #ef8fa6; --n11: #f6c9a8; --n12: #f7cf4a;
   --on-n: #1d2433;
+  --ok: #8fd9a8; --bad: #f4a3a3;
   --f-display: "Baloo 2", "Trebuchet MS", sans-serif;
   --f-body: "Nunito", system-ui, sans-serif;
 }
@@ -90,6 +91,26 @@ button.ctl {
 button.ctl:hover { background: var(--hl); }
 button.ctl:focus-visible { outline: 3px solid var(--n4); outline-offset: 2px; }
 .nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* Övningsläge */
+.tabs { display: flex; gap: 8px; justify-content: center; }
+.tabs .ctl[aria-pressed="true"] { background: var(--n2); color: #1d2433; }
+.practice { background: var(--paper); border: 3px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.chip { min-width: 44px; padding: 8px 0; }
+.chip[aria-pressed="true"] { background: var(--c); color: #1d2433; }
+.setup, .quiz, .done { display: grid; gap: 14px; justify-items: center; text-align: center; }
+.setup h2, .done h2 { font-family: var(--f-display); margin: 0; font-size: 1.5rem; }
+.q { font-family: var(--f-display); font-weight: 800; font-size: clamp(2.8rem, 16vw, 5rem); line-height: 1; }
+.progress { font-weight: 800; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(100%, 420px); }
+.answers .ctl { font-family: var(--f-display); font-size: clamp(1.5rem, 7vw, 2.2rem); padding: 14px 8px; }
+.answers .ctl.right { background: var(--ok); color: #1d2433; }
+.answers .ctl.wrong { background: var(--bad); color: #1d2433; }
+.answers .ctl:disabled { cursor: default; opacity: 1; }
+.fb { min-height: 1.6em; font-weight: 800; font-size: 1.15rem; margin: 0; }
+.stars { font-size: 2rem; letter-spacing: .1em; color: var(--n2); text-shadow: 0 0 1px var(--line); }
+.missed { color: var(--muted); font-weight: 700; margin: 0; }
 @media (prefers-reduced-motion: reduce) { .card { animation: none; } .cell { transition: none; } }
 </style>
 
@@ -107,8 +128,38 @@ button.ctl:focus-visible { outline: 3px solid var(--n4); outline-offset: 2px; }
     </g>
     <g fill="#cfe2f3"><ellipse cx="52" cy="112" rx="50" ry="18"/><ellipse cx="308" cy="112" rx="50" ry="18"/></g>
   </svg>
-  <p class="hint">Tryck på ett tal i tabellen för att få det stort.</p>
-  <div class="board"><div class="grid" id="grid" role="grid" aria-label="Gångertabell 1 till 12"></div></div>
+  <div class="tabs">
+    <button class="ctl" id="tabTable" type="button" aria-pressed="true">Tabell</button>
+    <button class="ctl" id="tabPractice" type="button" aria-pressed="false">Öva</button>
+  </div>
+  <p class="hint" id="hint">Tryck på ett tal i tabellen för att få det stort.</p>
+  <div class="board" id="board"><div class="grid" id="grid" role="grid" aria-label="Gångertabell 1 till 12"></div></div>
+
+  <section class="practice" id="practice" hidden>
+    <div class="setup" id="setup">
+      <h2>Vilka tabeller vill du öva?</h2>
+      <div class="chips" id="chips"></div>
+      <button class="ctl" id="allBtn" type="button">Välj alla</button>
+      <button class="ctl" id="startBtn" type="button">Starta: 10 frågor</button>
+    </div>
+    <div class="quiz" id="quiz" hidden>
+      <div class="progress"><span id="qnum"></span><span id="score"></span></div>
+      <div class="q" id="qtext"></div>
+      <div class="answers" id="answers"></div>
+      <p class="fb" id="fb" aria-live="polite"></p>
+      <button class="ctl" id="nextQ" type="button" hidden>Nästa →</button>
+    </div>
+    <div class="done" id="done" hidden>
+      <h2 id="doneTitle"></h2>
+      <div class="stars" id="stars" aria-hidden="true"></div>
+      <p class="missed" id="missed"></p>
+      <div class="nav">
+        <button class="ctl" id="againBtn" type="button">Öva igen</button>
+        <button class="ctl" id="missBtn" type="button" hidden>Öva på de missade</button>
+        <button class="ctl" id="setupBtn" type="button">Byt tabeller</button>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div class="overlay" id="overlay" hidden role="dialog" aria-modal="true" aria-label="Förstorat tal">
@@ -205,5 +256,108 @@ button.ctl:focus-visible { outline: 3px solid var(--n4); outline-offset: 2px; }
     else if (e.key === 'ArrowRight') step(1);
     else if (e.key === 'ArrowLeft') step(-1);
   });
+})();
+
+/* ---------- Övningsläge ---------- */
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var ROUND = 10, picked = {}, qs = [], idx = 0, right = 0, missed = [], locked = false;
+  for (var t = 2; t <= 5; t++) picked[t] = true;
+
+  function show(view) { ['setup', 'quiz', 'done'].forEach(function (v) { $(v).hidden = v !== view; }); }
+  function mode(practice) {
+    $('practice').hidden = !practice; $('board').hidden = practice; $('hint').hidden = practice;
+    $('tabTable').setAttribute('aria-pressed', String(!practice));
+    $('tabPractice').setAttribute('aria-pressed', String(practice));
+    if (practice) show('setup');
+  }
+  $('tabTable').onclick = function () { mode(false); };
+  $('tabPractice').onclick = function () { mode(true); };
+
+  var chips = $('chips');
+  for (var n = 1; n <= 12; n++) (function (n) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'ctl chip'; b.textContent = n;
+    b.style.setProperty('--c', 'var(--n' + n + ')');
+    b.setAttribute('aria-pressed', String(!!picked[n]));
+    b.onclick = function () { picked[n] = !picked[n]; b.setAttribute('aria-pressed', String(!!picked[n])); sync(); };
+    chips.appendChild(b);
+  })(n);
+  function sync() { $('startBtn').disabled = !Object.keys(picked).some(function (k) { return picked[k]; }); }
+  $('allBtn').onclick = function () {
+    for (var i = 1; i <= 12; i++) picked[i] = true;
+    Array.prototype.forEach.call(chips.children, function (c) { c.setAttribute('aria-pressed', 'true'); });
+    sync();
+  };
+  sync();
+
+  function rnd(m) { return Math.floor(Math.random() * m); }
+  function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
+
+  function makeQuestions() {
+    var tabs = Object.keys(picked).filter(function (k) { return picked[k]; }).map(Number);
+    var out = [], seen = {};
+    var pool = [];
+    tabs.forEach(function (a) { for (var b = 1; b <= 12; b++) pool.push([a, b]); });
+    shuffle(pool);
+    pool.forEach(function (p) { if (out.length < ROUND) out.push(Math.random() < .5 ? p : [p[1], p[0]]); });
+    while (out.length < ROUND) out.push(out[rnd(out.length)]);
+    return out;
+  }
+  function options(a, b) {
+    var c = a * b, set = {}; set[c] = true;
+    var cand = [a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b, c + 1, c - 1, c + 10, c - 10, c + a, c - b];
+    shuffle(cand);
+    var list = [c];
+    cand.forEach(function (x) { if (list.length < 4 && x > 0 && !set[x]) { set[x] = true; list.push(x); } });
+    var k = 2; while (list.length < 4) { if (!set[c + k]) { set[c + k] = true; list.push(c + k); } k++; }
+    return shuffle(list);
+  }
+
+  function start(questions) {
+    qs = questions; idx = 0; right = 0; missed = []; show('quiz'); ask();
+  }
+  function ask() {
+    var q = qs[idx], a = q[0], b = q[1]; locked = false;
+    $('qnum').textContent = 'Fråga ' + (idx + 1) + ' av ' + qs.length;
+    $('score').textContent = right + ' rätt';
+    $('qtext').textContent = a + ' × ' + b + ' = ?';
+    $('fb').textContent = ''; $('nextQ').hidden = true;
+    var box = $('answers'); box.textContent = '';
+    options(a, b).forEach(function (v) {
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'ctl'; btn.textContent = v;
+      btn.onclick = function () { pick(btn, v, a * b); };
+      box.appendChild(btn);
+    });
+  }
+  function pick(btn, v, correct) {
+    if (locked) return; locked = true;
+    var q = qs[idx];
+    Array.prototype.forEach.call($('answers').children, function (x) {
+      x.disabled = true; if (+x.textContent === correct) x.classList.add('right');
+    });
+    if (v === correct) { right++; $('fb').textContent = 'Rätt! Bra jobbat.'; }
+    else { btn.classList.add('wrong'); missed.push(q); $('fb').textContent = 'Nästan. ' + q[0] + ' × ' + q[1] + ' = ' + correct; }
+    $('score').textContent = right + ' rätt';
+    $('nextQ').textContent = idx + 1 === qs.length ? 'Se resultat' : 'Nästa →';
+    $('nextQ').hidden = false; $('nextQ').focus();
+  }
+  $('nextQ').onclick = function () { idx++; if (idx < qs.length) ask(); else finish(); };
+
+  function finish() {
+    show('done');
+    var total = qs.length, stars = Math.round(right / total * 5);
+    $('doneTitle').textContent = right === total ? 'Alla rätt!' : right + ' av ' + total + ' rätt';
+    $('stars').textContent = '★★★★★'.slice(0, stars) + '☆☆☆☆☆'.slice(0, 5 - stars);
+    var seen = {}, txt = [];
+    missed.forEach(function (q) { var k = q[0] + '×' + q[1]; if (!seen[k]) { seen[k] = 1; txt.push(q[0] + ' × ' + q[1] + ' = ' + q[0] * q[1]); } });
+    $('missed').textContent = txt.length ? 'Att träna mer på: ' + txt.join(', ') : '';
+    $('missBtn').hidden = !missed.length;
+  }
+  $('startBtn').onclick = function () { start(makeQuestions()); };
+  $('againBtn').onclick = function () { start(makeQuestions()); };
+  $('missBtn').onclick = function () { start(shuffle(missed.slice())); };
+  $('setupBtn').onclick = function () { show('setup'); };
 })();
 </script>
