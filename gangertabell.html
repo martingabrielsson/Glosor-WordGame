@@ -1,0 +1,209 @@
+<title>Regnbågens gångertabell</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&display=swap">
+<style>
+/* Layout: regnbåge överst, tabell 13x13 under, förstoring som ruta över tabellen. */
+:root {
+  --bg: #f6f8fc;
+  --paper: #ffffff;
+  --ink: #1d2433;
+  --muted: #5d6679;
+  --line: #1d2433;
+  --cell: #ffffff;
+  --hl: #fff3b8;
+  --shadow: rgba(29, 36, 51, .25);
+  --n1: #f6c9a8; --n2: #f7cf4a; --n3: #dfe39a; --n4: #3f86d6;
+  --n5: #a9b0dc; --n6: #3f86d6; --n7: #dfe39a; --n8: #f7cf4a;
+  --n9: #f6c9a8; --n10: #ef8fa6; --n11: #f6c9a8; --n12: #f7cf4a;
+  --on-n: #1d2433;
+  --f-display: "Baloo 2", "Trebuchet MS", sans-serif;
+  --f-body: "Nunito", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131a2a; --paper: #1b2438; --ink: #eef1f8; --muted: #a4adc2;
+    --line: #8d98b3; --cell: #222d45; --hl: #5a4d12; --shadow: rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131a2a; --paper: #1b2438; --ink: #eef1f8; --muted: #a4adc2;
+  --line: #8d98b3; --cell: #222d45; --hl: #5a4d12; --shadow: rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body);
+  padding-block: 20px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 760px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.6rem, 5vw, 2.4rem); margin: 0; text-wrap: balance; text-align: center; }
+.hint { margin: 0; text-align: center; color: var(--muted); font-weight: 600; }
+
+.rainbow { width: min(100%, 360px); margin: 0 auto; display: block; }
+
+.board {
+  background: var(--paper); border: 3px solid var(--line); border-radius: 6px;
+  padding: 0; overflow: hidden;
+}
+.grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 1px; background: var(--line); }
+.grid > * {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  font-family: var(--f-display); font-weight: 800; font-size: clamp(.62rem, 2.6vw, 1.25rem);
+  border: 0; padding: 0; margin: 0; color: var(--on-n);
+}
+.head { background: var(--c); }
+.corner { background: #f7cf4a; }
+.cell { background: var(--cell); color: var(--ink); cursor: pointer; transition: transform .1s, background .1s; }
+.cell:hover, .cell:focus-visible { background: var(--hl); transform: scale(1.12); position: relative; z-index: 2; outline: 2px solid var(--ink); }
+.cell.rowcol { background: var(--hl); }
+.cell.sel { background: var(--n10); color: #1d2433; }
+
+/* Förstoring */
+.overlay {
+  position: fixed; inset: 0; z-index: 20; background: rgba(15, 20, 35, .55);
+  display: flex; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.card {
+  background: var(--paper); border-radius: 22px; width: min(100%, 460px);
+  padding: 20px; display: grid; gap: 14px; box-shadow: 0 20px 50px var(--shadow);
+  animation: pop .18s ease-out;
+}
+@keyframes pop { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.eq { font-family: var(--f-display); font-weight: 800; text-align: center; line-height: 1;
+  font-size: clamp(2.6rem, 16vw, 4.6rem); display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: .15em; }
+.eq .f { background: var(--fa); color: var(--on-n); border-radius: 16px; padding: .08em .28em; }
+.eq .g { background: var(--fb); color: var(--on-n); border-radius: 16px; padding: .08em .28em; }
+.eq .op { color: var(--muted); }
+.eq .res { color: var(--ink); }
+.words { text-align: center; margin: 0; font-weight: 700; color: var(--muted); font-size: 1.05rem; }
+.dots { display: grid; gap: 4px; justify-content: center; margin: 0 auto; max-width: 100%; }
+.dots i { width: var(--d); height: var(--d); border-radius: 50%; background: var(--fa); display: block; }
+.dots i.alt { background: var(--fa); }
+button.ctl {
+  font: inherit; font-weight: 800; border: 2px solid var(--line); background: var(--cell); color: var(--ink);
+  border-radius: 12px; padding: 10px 14px; cursor: pointer; min-height: 44px;
+}
+button.ctl:hover { background: var(--hl); }
+button.ctl:focus-visible { outline: 3px solid var(--n4); outline-offset: 2px; }
+.nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+@media (prefers-reduced-motion: reduce) { .card { animation: none; } .cell { transition: none; } }
+</style>
+
+<main>
+  <h1>Regnbågens gångertabell</h1>
+  <svg class="rainbow" viewBox="0 0 360 130" role="img" aria-label="Regnbåge med moln">
+    <g fill="none" stroke-width="12">
+      <path d="M40 120 A140 140 0 0 1 320 120" stroke="#a79fd8"/>
+      <path d="M52 120 A128 128 0 0 1 308 120" stroke="#8fb6e6"/>
+      <path d="M64 120 A116 116 0 0 1 296 120" stroke="#a9dbd3"/>
+      <path d="M76 120 A104 104 0 0 1 284 120" stroke="#d9e69a"/>
+      <path d="M88 120 A92 92 0 0 1 272 120" stroke="#f8dc7a"/>
+      <path d="M100 120 A80 80 0 0 1 260 120" stroke="#f7b98c"/>
+      <path d="M112 120 A68 68 0 0 1 248 120" stroke="#ee8fa6"/>
+    </g>
+    <g fill="#cfe2f3"><ellipse cx="52" cy="112" rx="50" ry="18"/><ellipse cx="308" cy="112" rx="50" ry="18"/></g>
+  </svg>
+  <p class="hint">Tryck på ett tal i tabellen för att få det stort.</p>
+  <div class="board"><div class="grid" id="grid" role="grid" aria-label="Gångertabell 1 till 12"></div></div>
+</main>
+
+<div class="overlay" id="overlay" hidden role="dialog" aria-modal="true" aria-label="Förstorat tal">
+  <div class="card" id="card">
+    <div class="bar">
+      <button class="ctl" id="swap" type="button"></button>
+      <button class="ctl" id="close" type="button" aria-label="Stäng">Stäng ✕</button>
+    </div>
+    <div class="eq" id="eq"></div>
+    <p class="words" id="words"></p>
+    <div class="dots" id="dots" aria-hidden="true"></div>
+    <div class="nav">
+      <button class="ctl" id="prev" type="button">← Förra</button>
+      <button class="ctl" id="next" type="button">Nästa →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var N = 12, grid = document.getElementById('grid'), ov = document.getElementById('overlay');
+  var cur = { a: 1, b: 1 }, cells = {};
+
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function colorVar(n) { return 'var(--n' + n + ')'; }
+
+  var corner = el('div', 'corner', '×'); grid.appendChild(corner);
+  for (var c = 1; c <= N; c++) { var h = el('div', 'head', c); h.style.setProperty('--c', colorVar(c)); grid.appendChild(h); }
+  for (var r = 1; r <= N; r++) {
+    var rh = el('div', 'head', r); rh.style.setProperty('--c', colorVar(r)); grid.appendChild(rh);
+    for (c = 1; c <= N; c++) {
+      var b = el('button', 'cell', r * c);
+      b.type = 'button';
+      b.setAttribute('aria-label', r + ' gånger ' + c + ' är ' + r * c);
+      b.dataset.a = r; b.dataset.b = c;
+      cells[r + ',' + c] = b;
+      grid.appendChild(b);
+    }
+  }
+
+  grid.addEventListener('click', function (e) {
+    var t = e.target.closest('.cell'); if (t) open(+t.dataset.a, +t.dataset.b);
+  });
+  grid.addEventListener('mouseover', function (e) {
+    var t = e.target.closest('.cell'); mark(t ? +t.dataset.a : 0, t ? +t.dataset.b : 0, false);
+  });
+  grid.addEventListener('mouseleave', function () { mark(0, 0, false); });
+
+  function mark(a, b, sel) {
+    for (var k in cells) {
+      var p = k.split(','), x = +p[0], y = +p[1];
+      cells[k].classList.toggle('rowcol', !!a && (x === a && y <= b || y === b && x <= a) && !(x === a && y === b));
+      cells[k].classList.toggle('sel', sel && x === a && y === b);
+    }
+  }
+
+  function open(a, b) {
+    cur = { a: a, b: b };
+    var card = document.getElementById('card');
+    card.style.setProperty('--fa', colorVar(a));
+    card.style.setProperty('--fb', colorVar(b));
+    var eq = document.getElementById('eq'); eq.textContent = '';
+    eq.appendChild(el('span', 'f', a)); eq.appendChild(el('span', 'op', '×'));
+    eq.appendChild(el('span', 'g', b)); eq.appendChild(el('span', 'op', '='));
+    eq.appendChild(el('span', 'res', a * b));
+    document.getElementById('words').textContent = a + ' grupper med ' + b + ' i varje blir ' + a * b;
+    var dots = document.getElementById('dots'); dots.textContent = '';
+    var d = Math.max(10, Math.min(22, Math.floor(300 / b) - 4));
+    dots.style.setProperty('--d', d + 'px');
+    dots.style.gridTemplateColumns = 'repeat(' + b + ', ' + d + 'px)';
+    for (var i = 0; i < a * b; i++) dots.appendChild(el('i'));
+    var sw = document.getElementById('swap');
+    sw.textContent = a === b ? 'Samma båda hållen' : 'Vänd: ' + b + ' × ' + a;
+    sw.disabled = a === b;
+    mark(a, b, true);
+    ov.hidden = false;
+    document.getElementById('close').focus();
+  }
+  function close() { ov.hidden = true; mark(0, 0, false); if (cells[cur.a + ',' + cur.b]) cells[cur.a + ',' + cur.b].focus(); }
+  function step(dir) {
+    var i = (cur.a - 1) * N + (cur.b - 1) + dir;
+    if (i < 0 || i >= N * N) return;
+    open(Math.floor(i / N) + 1, i % N + 1);
+  }
+
+  document.getElementById('close').onclick = close;
+  document.getElementById('swap').onclick = function () { open(cur.b, cur.a); };
+  document.getElementById('prev').onclick = function () { step(-1); };
+  document.getElementById('next').onclick = function () { step(1); };
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  document.addEventListener('keydown', function (e) {
+    if (ov.hidden) return;
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowRight') step(1);
+    else if (e.key === 'ArrowLeft') step(-1);
+  });
+})();
+</script>
