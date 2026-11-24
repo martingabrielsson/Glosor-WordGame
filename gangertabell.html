@@ -17,6 +17,7 @@
   --n9: #f6c9a8; --n10: #ef8fa6; --n11: #f6c9a8; --n12: #f7cf4a;
   --on-n: #1d2433;
   --ok: #8fd9a8; --bad: #f4a3a3;
+  --diag: #ffd6df; --diagline: #d93a64;
   --f-display: "Baloo 2", "Trebuchet MS", sans-serif;
   --f-body: "Nunito", system-ui, sans-serif;
 }
@@ -24,12 +25,14 @@
   :root:not([data-theme="light"]) {
     --bg: #131a2a; --paper: #1b2438; --ink: #eef1f8; --muted: #a4adc2;
     --line: #8d98b3; --cell: #222d45; --hl: #5a4d12; --shadow: rgba(0,0,0,.6);
+    --diag: #5a2a3a; --diagline: #ff7a9c;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #131a2a; --paper: #1b2438; --ink: #eef1f8; --muted: #a4adc2;
   --line: #8d98b3; --cell: #222d45; --hl: #5a4d12; --shadow: rgba(0,0,0,.6);
+  --diag: #5a2a3a; --diagline: #ff7a9c;
   color-scheme: dark;
 }
 body {
@@ -45,7 +48,7 @@ h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.6rem, 5
 .rainbow { width: min(100%, 360px); margin: 0 auto; display: block; }
 
 .board {
-  background: var(--paper); border: 3px solid var(--line); border-radius: 6px;
+  position: relative; background: var(--paper); border: 3px solid var(--line); border-radius: 6px;
   padding: 0; overflow: hidden;
 }
 .grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 1px; background: var(--line); }
@@ -57,6 +60,12 @@ h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.6rem, 5
 .head { background: var(--c); }
 .corner { background: #f7cf4a; }
 .cell { background: var(--cell); color: var(--ink); cursor: pointer; transition: transform .1s, background .1s; }
+.board.show-diag .cell.diag { background: var(--diag); }
+.diagline { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+.diagline line { stroke: var(--diagline); stroke-width: 4; stroke-linecap: round; opacity: .7; vector-effect: non-scaling-stroke; }
+.board:not(.show-diag) .diagline { display: none; }
+.tools { display: flex; justify-content: center; }
+.tools .ctl[aria-pressed="true"] { background: var(--diag); }
 .cell:hover, .cell:focus-visible { background: var(--hl); transform: scale(1.12); position: relative; z-index: 2; outline: 2px solid var(--ink); }
 .cell.rowcol { background: var(--hl); }
 .cell.sel { background: var(--n10); color: #1d2433; }
@@ -133,7 +142,14 @@ button.ctl:focus-visible { outline: 3px solid var(--n4); outline-offset: 2px; }
     <button class="ctl" id="tabPractice" type="button" aria-pressed="false">Öva</button>
   </div>
   <p class="hint" id="hint">Tryck på ett tal i tabellen för att få det stort.</p>
-  <div class="board" id="board"><div class="grid" id="grid" role="grid" aria-label="Gångertabell 1 till 12"></div></div>
+  <div class="tools" id="tools">
+    <button class="ctl" id="diagBtn" type="button" aria-pressed="true">Diagonal: lika tal (7 × 7, 12 × 12)</button>
+  </div>
+  <div class="board show-diag" id="board"><div class="grid" id="grid" role="grid" aria-label="Gångertabell 1 till 12"></div>
+    <svg class="diagline" viewBox="0 0 13 13" preserveAspectRatio="none" aria-hidden="true">
+      <line x1="1.5" y1="1.5" x2="12.5" y2="12.5"/>
+    </svg>
+  </div>
 
   <section class="practice" id="practice" hidden>
     <div class="setup" id="setup">
@@ -195,6 +211,7 @@ button.ctl:focus-visible { outline: 3px solid var(--n4); outline-offset: 2px; }
       b.type = 'button';
       b.setAttribute('aria-label', r + ' gånger ' + c + ' är ' + r * c);
       b.dataset.a = r; b.dataset.b = c;
+      if (r === c) b.classList.add('diag');
       cells[r + ',' + c] = b;
       grid.appendChild(b);
     }
@@ -225,7 +242,7 @@ button.ctl:focus-visible { outline: 3px solid var(--n4); outline-offset: 2px; }
     eq.appendChild(el('span', 'f', a)); eq.appendChild(el('span', 'op', '×'));
     eq.appendChild(el('span', 'g', b)); eq.appendChild(el('span', 'op', '='));
     eq.appendChild(el('span', 'res', a * b));
-    document.getElementById('words').textContent = a + ' grupper med ' + b + ' i varje blir ' + a * b;
+    document.getElementById('words').textContent = a + ' grupper med ' + b + ' i varje blir ' + a * b + (a === b ? '. Lika tal på båda axlarna: ' + a * b + ' är ett kvadrattal.' : '');
     var dots = document.getElementById('dots'); dots.textContent = '';
     var d = Math.max(10, Math.min(22, Math.floor(300 / b) - 4));
     dots.style.setProperty('--d', d + 'px');
@@ -266,11 +283,15 @@ button.ctl:focus-visible { outline: 3px solid var(--n4); outline-offset: 2px; }
 
   function show(view) { ['setup', 'quiz', 'done'].forEach(function (v) { $(v).hidden = v !== view; }); }
   function mode(practice) {
-    $('practice').hidden = !practice; $('board').hidden = practice; $('hint').hidden = practice;
+    $('practice').hidden = !practice; $('board').hidden = practice; $('hint').hidden = practice; $('tools').hidden = practice;
     $('tabTable').setAttribute('aria-pressed', String(!practice));
     $('tabPractice').setAttribute('aria-pressed', String(practice));
     if (practice) show('setup');
   }
+  $('diagBtn').onclick = function () {
+    var on = $('board').classList.toggle('show-diag');
+    $('diagBtn').setAttribute('aria-pressed', String(on));
+  };
   $('tabTable').onclick = function () { mode(false); };
   $('tabPractice').onclick = function () { mode(true); };
 
