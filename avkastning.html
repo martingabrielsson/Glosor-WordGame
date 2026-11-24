@@ -65,7 +65,7 @@ h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.6rem, 5
   padding: 0 6px; font-size: .95rem; letter-spacing: .02em; display: flex; align-items: center; justify-content: center;
 }
 .scroll { overflow-x: auto; min-width: 0; }
-.grid { display: grid; grid-template-columns: repeat(20, minmax(54px, 1fr)); gap: 1px; background: var(--line); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.grid { display: grid; grid-template-columns: repeat(25, minmax(54px, 1fr)); gap: 1px; background: var(--line); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 .grid > * {
   display: flex; align-items: center; justify-content: center; min-height: 32px;
   font-family: var(--f-display); font-weight: 800; border: 0; padding: 2px 0; margin: 0; color: var(--ink);
@@ -110,7 +110,7 @@ h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.6rem, 5
   </section>
 
   <div class="board">
-    <div class="axis-top">Belopp per dag, från $50 med steg om $25 →</div>
+    <div class="axis-top">Belopp per dag, från $40 med steg om $20 →</div>
     <div class="wrap">
       <div class="axis-left">Antal dagar, steg om 5 →</div>
       <div class="scroll"><div class="grid" id="grid" role="grid" aria-label="Total för dagar och belopp per dag"></div></div>
@@ -127,11 +127,11 @@ h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.6rem, 5
 
 <script>
 (function () {
-  var ROWS = 24, DSTEP = 5, BASE = 50, STEP = 25, COLS = 19, MAX = ROWS * DSTEP * (BASE + (COLS - 1) * STEP);
+  var ROWS = 24, DSTEP = 5, BASE = 40, STEP = 20, COLS = 24, MAX = ROWS * DSTEP * (BASE + (COLS - 1) * STEP);
   function dayOf(i) { return i * DSTEP; }
   function amtOf(c) { return BASE + (c - 1) * STEP; }
   var grid = document.getElementById('grid');
-  var sel = { d: 3, a: 1 };           // förvalt: 15 dagar, $50
+  var sel = { d: 3, a: 1 };           // förvalt: 15 dagar, $40
   var hover = null, cells = {}, rowHeads = {}, colHeads = {};
 
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
